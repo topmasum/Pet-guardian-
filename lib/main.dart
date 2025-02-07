@@ -2,6 +2,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:pet_guardian/home_activity.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -100,7 +101,7 @@ class HomePage extends StatelessWidget {
               onPressed: () {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (context) => SignupPage()),
+                  MaterialPageRoute(builder: (context) => SignUpPage()),
                 );
               },
               style: ElevatedButton.styleFrom(
@@ -207,52 +208,52 @@ class LoginPage extends StatelessWidget {
   }
 }
 
-class SignupPage extends StatefulWidget {
+class SignUpPage extends StatefulWidget {
   @override
-  _SignupPageState createState() => _SignupPageState();
+  _SignUpPageState createState() => _SignUpPageState();
 }
 
-class _SignupPageState extends State<SignupPage> {
+class _SignUpPageState extends State<SignUpPage> {
   final _formKey = GlobalKey<FormState>();
   final FirebaseAuth _auth = FirebaseAuth.instance;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
-  final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _phoneController = TextEditingController();
   final TextEditingController _addressController = TextEditingController();
-  final List<String> _pets = ['Bird', 'Cat', 'Dog', 'Fish', 'Other'];
-  final List<String> _selectedPets = [];
+  final TextEditingController _passwordController = TextEditingController();
 
-  Future<void> _signup() async {
+  List<String> _pets = ["Dog", "Cat", "Rabbit", "Bird", "Fish"];
+  List<String> _selectedPets = [];
+
+  Future<void> _signUp() async {
     if (_formKey.currentState!.validate()) {
-      if (_selectedPets.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Please select at least one pet')),
-        );
-        return;
-      }
-
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (context) => Center(child: CircularProgressIndicator()),
-      );
-
       try {
-        await _auth.createUserWithEmailAndPassword(
+        UserCredential userCredential = await _auth.createUserWithEmailAndPassword(
           email: _emailController.text.trim(),
           password: _passwordController.text.trim(),
         );
-        Navigator.of(context).pop(); // Remove loading indicator
+
+        // Store additional user info in Firestore
+        await _firestore.collection('users').doc(userCredential.user!.uid).set({
+          'name': _nameController.text.trim(),
+          'email': _emailController.text.trim(),
+          'phone': _phoneController.text.trim(),
+          'address': _addressController.text.trim(),
+          'pets': _selectedPets,
+          'uid': userCredential.user!.uid,
+          'created_at': FieldValue.serverTimestamp(),
+        });
+
+        // Navigate to HomeActivity after successful signup
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (context) => HomeActivity()),
         );
-      } on FirebaseAuthException catch (e) {
-        Navigator.of(context).pop(); // Remove loading indicator
+      } catch (e) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: ${e.message}')),
+          SnackBar(content: Text('Error: ${e.toString()}')),
         );
       }
     }
@@ -331,7 +332,7 @@ class _SignupPageState extends State<SignupPage> {
               ),
               SizedBox(height: 30),
               ElevatedButton(
-                onPressed: _signup,
+                onPressed: _signUp,
                 style: ElevatedButton.styleFrom(
                   padding: EdgeInsets.symmetric(horizontal: 80, vertical: 18),
                   shape: RoundedRectangleBorder(
