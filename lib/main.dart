@@ -208,6 +208,7 @@ class LoginPage extends StatelessWidget {
   }
 }
 
+
 class SignUpPage extends StatefulWidget {
   @override
   _SignUpPageState createState() => _SignUpPageState();
@@ -218,39 +219,42 @@ class _SignUpPageState extends State<SignUpPage> {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  final TextEditingController _nameController = TextEditingController();
+  final TextEditingController _firstNameController = TextEditingController();
+  final TextEditingController _lastNameController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _phoneController = TextEditingController();
-  final TextEditingController _addressController = TextEditingController();
+  final TextEditingController _usernameController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
-
-  List<String> _pets = ["Dog", "Cat", "Rabbit", "Bird", "Fish"];
-  List<String> _selectedPets = [];
+  final TextEditingController _confirmPasswordController = TextEditingController();
+  bool _passwordVisible = false;
+  bool _confirmPasswordVisible = false;
 
   Future<void> _signUp() async {
     if (_formKey.currentState!.validate()) {
       try {
-        UserCredential userCredential = await _auth.createUserWithEmailAndPassword(
+        UserCredential userCredential = await _auth
+            .createUserWithEmailAndPassword(
           email: _emailController.text.trim(),
           password: _passwordController.text.trim(),
         );
 
-        // Store additional user info in Firestore
         await _firestore.collection('users').doc(userCredential.user!.uid).set({
-          'name': _nameController.text.trim(),
+          'first_name': _firstNameController.text.trim(),
+          'last_name': _lastNameController.text.trim(),
           'email': _emailController.text.trim(),
           'phone': _phoneController.text.trim(),
-          'address': _addressController.text.trim(),
-          'pets': _selectedPets,
+          'username': _usernameController.text.trim().isEmpty
+              ? '${_firstNameController.text.trim()} ${_lastNameController.text.trim()}'
+              : _usernameController.text.trim(),
           'uid': userCredential.user!.uid,
           'created_at': FieldValue.serverTimestamp(),
         });
 
-        // Navigate to HomeActivity after successful signup
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => HomeActivity()),
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Signup successful!')),
         );
+        Navigator.pop(context);
       } catch (e) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error: ${e.toString()}')),
@@ -263,7 +267,7 @@ class _SignUpPageState extends State<SignUpPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Signup'),
+        title: Text('Sign Up'),
         backgroundColor: Colors.teal,
       ),
       body: Padding(
@@ -272,19 +276,39 @@ class _SignUpPageState extends State<SignUpPage> {
           key: _formKey,
           child: ListView(
             children: [
-              TextFormField(
-                controller: _nameController,
-                decoration: InputDecoration(labelText: 'Name'),
-                validator: (value) => value!.isEmpty ? 'Please enter your name' : null,
+              Row(
+                children: [
+                  Expanded(
+                    child: TextFormField(
+                      controller: _firstNameController,
+                      decoration: InputDecoration(labelText: 'First Name'),
+                      validator: (value) =>
+                      value!.isEmpty
+                          ? 'Enter first name'
+                          : null,
+                    ),
+                  ),
+                  SizedBox(width: 10),
+                  Expanded(
+                    child: TextFormField(
+                      controller: _lastNameController,
+                      decoration: InputDecoration(labelText: 'Last Name'),
+                      validator: (value) =>
+                      value!.isEmpty
+                          ? 'Enter last name'
+                          : null,
+                    ),
+                  ),
+                ],
               ),
               SizedBox(height: 15),
               TextFormField(
                 controller: _emailController,
-                decoration: InputDecoration(labelText: 'Email'),
+                decoration: InputDecoration(labelText: 'Email Address'),
                 validator: (value) {
-                  if (value!.isEmpty) return 'Please enter your email';
+                  if (value!.isEmpty) return 'Enter your email';
                   if (!RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(value)) {
-                    return 'Enter a valid email address';
+                    return 'Enter a valid email';
                   }
                   return null;
                 },
@@ -292,43 +316,62 @@ class _SignUpPageState extends State<SignUpPage> {
               SizedBox(height: 15),
               TextFormField(
                 controller: _phoneController,
-                decoration: InputDecoration(labelText: 'Phone Number'),
-                validator: (value) => value!.isEmpty ? 'Please enter your phone number' : null,
+                decoration: InputDecoration(
+                    labelText: 'Phone Number (Optional)'),
+                keyboardType: TextInputType.phone,
               ),
               SizedBox(height: 15),
               TextFormField(
-                controller: _addressController,
-                decoration: InputDecoration(labelText: 'Address'),
-                validator: (value) => value!.isEmpty ? 'Please enter your address' : null,
-              ),
-              SizedBox(height: 15),
-              Text('Select the pets you own:'),
-              Wrap(
-                spacing: 10.0,
-                children: _pets.map((pet) {
-                  return FilterChip(
-                    label: Text(pet),
-                    selected: _selectedPets.contains(pet),
-                    onSelected: (selected) {
-                      setState(() {
-                        if (selected) {
-                          _selectedPets.add(pet);
-                        } else {
-                          _selectedPets.remove(pet);
-                        }
-                      });
-                    },
-                    selectedColor: Colors.tealAccent,
-                  );
-                }).toList(),
+                controller: _usernameController,
+                decoration: InputDecoration(labelText: 'Username (Optional)'),
               ),
               SizedBox(height: 15),
               TextFormField(
                 controller: _passwordController,
-                obscureText: true,
-                decoration: InputDecoration(labelText: 'Password'),
+                obscureText: !_passwordVisible,
+                decoration: InputDecoration(
+                  labelText: 'Password',
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                      _passwordVisible ? Icons.visibility : Icons
+                          .visibility_off,
+                    ),
+                    onPressed: () {
+                      setState(() {
+                        _passwordVisible = !_passwordVisible;
+                      });
+                    },
+                  ),
+                ),
                 validator: (value) =>
-                value!.length < 6 ? 'Password must be at least 6 characters' : null,
+                value!.length < 6
+                    ? 'Password must be at least 6 characters'
+                    : null,
+              ),
+              SizedBox(height: 15),
+              TextFormField(
+                controller: _confirmPasswordController,
+                obscureText: !_confirmPasswordVisible,
+                decoration: InputDecoration(
+                  labelText: 'Confirm Password',
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                      _confirmPasswordVisible ? Icons.visibility : Icons
+                          .visibility_off,
+                    ),
+                    onPressed: () {
+                      setState(() {
+                        _confirmPasswordVisible = !_confirmPasswordVisible;
+                      });
+                    },
+                  ),
+                ),
+                validator: (value) {
+                  if (value != _passwordController.text) {
+                    return 'Passwords do not match';
+                  }
+                  return null;
+                },
               ),
               SizedBox(height: 30),
               ElevatedButton(
@@ -341,7 +384,7 @@ class _SignUpPageState extends State<SignUpPage> {
                   backgroundColor: Colors.teal,
                 ),
                 child: Text(
-                  'Signup',
+                  'Sign Up',
                   style: TextStyle(fontSize: 20, color: Colors.white),
                 ),
               ),

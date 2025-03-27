@@ -1,5 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 
 class RequestsPage extends StatefulWidget {
   @override
@@ -10,85 +12,198 @@ class _RequestsPageState extends State<RequestsPage> {
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
   final TextEditingController _petNameController = TextEditingController();
   final TextEditingController _careDetailsController = TextEditingController();
-  final TextEditingController _petCategoryController = TextEditingController();
-  final TextEditingController _reqDateController = TextEditingController();
-  final TextEditingController _requesterNameController = TextEditingController();
+  String _selectedPetCategory = 'Dog';
+  DateTime? _selectedDate;
+  String _currentUserId = '';
+  String _currentUserName = '';
 
-  void _submitRequest() {
-    FirebaseFirestore.instance.collection('requests').add({
-      'petName': _petNameController.text,
-      'careDetails': _careDetailsController.text,
-      'petCategory': _petCategoryController.text,
-      'reqDate': _reqDateController.text,
-      'requesterName': _requesterNameController.text,
-      'timestamp': FieldValue.serverTimestamp(),
-    }).then((value) {
-      setState(() {
-        _petNameController.clear();
-        _careDetailsController.clear();
-        _petCategoryController.clear();
-        _reqDateController.clear();
-        _requesterNameController.clear();
-      });
-    });
+  @override
+  void initState() {
+    super.initState();
+    _fetchUserData();
   }
+
+  Future<void> _fetchUserData() async {
+    User? user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      DocumentSnapshot userDoc =
+      await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+      if (userDoc.exists) {
+        setState(() {
+          _currentUserId = user.uid;
+          _currentUserName = userDoc['name'] ?? 'Unknown';
+        });
+      }
+    }
+  }
+
+  void _pickDate(BuildContext context) async {
+    DateTime? pickedDate = await showDatePicker(
+      context: context,
+      initialDate: DateTime.now(),
+      firstDate: DateTime.now(),
+      lastDate: DateTime(2100),
+    );
+    if (pickedDate != null) {
+      setState(() {
+        _selectedDate = pickedDate; // ✅ Updating the selected date
+      });
+    }
+  }
+
+  bool _isSubmitting = false; // ✅ Declare it at the top
+
+  void _submitRequest() async {
+    if (_formKey.currentState?.validate() ?? false) {
+      try {
+        if (_selectedDate == null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Please select a date')),
+          );
+          return;
+        }
+
+        User? user = FirebaseAuth.instance.currentUser;
+        if (user != null) {
+          DocumentSnapshot userDoc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+          String userName = userDoc.exists ? (userDoc['username'] ?? 'Unknown User') : 'Unknown User';
+
+          // ✅ Prevent multiple submissions
+          if (_isSubmitting) return;
+          setState(() {
+            _isSubmitting = true;
+          });
+
+          await FirebaseFirestore.instance.collection('requests').add({
+            'userId': user.uid,
+            'username': userName,
+            'petName': _petNameController.text.trim(),
+            'petCategory': _selectedPetCategory,
+            'careDetails': _careDetailsController.text.trim(),
+            'reqDate': DateFormat('yyyy-MM-dd').format(_selectedDate!),
+            'timestamp': FieldValue.serverTimestamp(),
+          });
+
+          // ✅ Clear form & close dialog
+          setState(() {
+            _petNameController.clear();
+            _careDetailsController.clear();
+            _selectedPetCategory = 'Dog';
+            _selectedDate = null;
+            _isSubmitting = false;
+          });
+
+          Navigator.of(context).pop(); // ✅ Close the form after submission
+        }
+      } catch (e) {
+        print("Error saving request: $e");
+        setState(() {
+          _isSubmitting = false;
+        });
+      }
+    }
+  }
+
+
 
   void _showFormDialog() {
     showDialog(
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: Text("Request Pet Care"),
-          content: Form(
-            key: _formKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextFormField(
-                  controller: _requesterNameController,
-                  decoration: InputDecoration(labelText: 'Your Name'),
-                  validator: (value) => value!.isEmpty ? 'Please enter your name' : null,
+          title: Center(child: Text("Request Pet Care", style: TextStyle(fontWeight: FontWeight.bold))),
+          content: SingleChildScrollView(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8.0),
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _buildTextField(_petNameController, 'Pet Name', 'Enter your pet’s name'),
+
+                    // Pet Category Dropdown
+                    DropdownButtonFormField<String>(
+                      decoration: InputDecoration(
+                        labelText: 'Pet Category',
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                      value: _selectedPetCategory,
+                      items: ['Dog', 'Cat', 'Bird', 'Others'].map((category) {
+                        return DropdownMenuItem<String>(
+                          value: category,
+                          child: Text(category),
+                        );
+                      }).toList(),
+                      onChanged: (value) {
+                        setState(() {
+                          _selectedPetCategory = value!;
+                        });
+                      },
+                    ),
+                    SizedBox(height: 15),
+
+                    _buildTextField(_careDetailsController, 'Care Details', 'Enter care details'),
+
+                    // Date Picker
+                    InkWell(
+                      onTap: () => _pickDate(context),
+                      child: InputDecorator(
+                        decoration: InputDecoration(
+                          labelText: 'Request Date',
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              _selectedDate != null
+                                  ? DateFormat('yyyy-MM-dd').format(_selectedDate!)
+                                  : 'Select a date',
+                              style: TextStyle(fontSize: 16),
+                            ),
+                            Icon(Icons.calendar_today, color: Colors.teal),
+                          ],
+                        ),
+                      ),
+                    ),
+                    SizedBox(height: 20),
+                  ],
                 ),
-                TextFormField(
-                  controller: _petNameController,
-                  decoration: InputDecoration(labelText: 'Pet Name'),
-                  validator: (value) => value!.isEmpty ? 'Please enter the pet name' : null,
-                ),
-                TextFormField(
-                  controller: _careDetailsController,
-                  decoration: InputDecoration(labelText: 'Care Details'),
-                  validator: (value) => value!.isEmpty ? 'Please enter care details' : null,
-                ),
-                TextFormField(
-                  controller: _petCategoryController,
-                  decoration: InputDecoration(labelText: 'Pet Category'),
-                  validator: (value) => value!.isEmpty ? 'Please enter the pet category' : null,
-                ),
-                TextFormField(
-                  controller: _reqDateController,
-                  decoration: InputDecoration(labelText: 'Request Date'),
-                  validator: (value) => value!.isEmpty ? 'Please enter the request date' : null,
-                ),
-              ],
+              ),
             ),
           ),
           actions: [
+            ElevatedButton(
+              onPressed: _submitRequest,
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.teal),
+              child: Text('Submit', style: TextStyle(color: Colors.white)),
+            ),
             TextButton(
               onPressed: () {
-                if (_formKey.currentState?.validate() ?? false) {
-                  _submitRequest();
-                  Navigator.of(context).pop();
-                }
+                Navigator.of(context).pop(); // ✅ Just close the dialog, don't log out!
               },
-              child: Text('Submit'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
               child: Text('Cancel'),
             ),
+
           ],
         );
       },
+    );
+  }
+
+  Widget _buildTextField(TextEditingController controller, String label, String hint) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      child: TextFormField(
+        controller: controller,
+        decoration: InputDecoration(
+          labelText: label,
+          hintText: hint,
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+        ),
+        validator: (value) => value!.isEmpty ? 'Please enter $label' : null,
+      ),
     );
   }
 
@@ -113,39 +228,40 @@ class _RequestsPageState extends State<RequestsPage> {
           itemCount: requests.length,
           itemBuilder: (context, index) {
             final request = requests[index];
+            final username = request['username'] ?? 'Unknown User'; // ✅ Ensure it never shows null
+
             final petName = request['petName'];
-            final careDetails = request['careDetails'];
             final petCategory = request['petCategory'];
+            final careDetails = request['careDetails'];
             final reqDate = request['reqDate'];
-            final requesterName = request['requesterName'];
-            final timestamp = request['timestamp']?.toDate();
 
             return Card(
               margin: EdgeInsets.all(8),
-              elevation: 6,
+              elevation: 4,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               child: Padding(
-                padding: EdgeInsets.all(16),
+                padding: const EdgeInsets.all(16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      requesterName,
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.teal),
-                    ),
-                    SizedBox(height: 8),
-                    Text('Pet Name: $petName', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                    Text(petName, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
                     SizedBox(height: 4),
-                    Text('Category: $petCategory', style: TextStyle(fontSize: 14, color: Colors.grey[700])),
-                    SizedBox(height: 4),
-                    Text('Care Details: $careDetails', style: TextStyle(fontSize: 14)),
-                    SizedBox(height: 4),
-                    Text('Request Date: $reqDate', style: TextStyle(fontSize: 14, color: Colors.grey[700])),
-                    if (timestamp != null)
-                      Text(
-                        'Submitted: ${timestamp.toLocal()}'.split('.')[0],
-                        style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                    Text('Requester: $username', style: TextStyle(fontSize: 16)),
+                    Text('Category: $petCategory', style: TextStyle(fontSize: 16)),
+                    Text('Care Details: $careDetails', style: TextStyle(fontSize: 16)),
+                    Text('Request Date: $reqDate', style: TextStyle(fontSize: 16, color: Colors.teal)),
+                    SizedBox(height: 10),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: ElevatedButton(
+                        onPressed: () {},
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.teal,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                        child: Text('Book Now', style: TextStyle(color: Colors.white)),
                       ),
+                    ),
                   ],
                 ),
               ),
@@ -168,7 +284,7 @@ class _RequestsPageState extends State<RequestsPage> {
         onPressed: _showFormDialog,
         child: Icon(Icons.add),
         tooltip: 'Add Request',
-        backgroundColor: Color(0xFF009688),
+        backgroundColor: Colors.teal,
       ),
     );
   }
