@@ -12,6 +12,7 @@ class _RequestsPageState extends State<RequestsPage> {
   final TextEditingController _careDetailsController = TextEditingController();
   final TextEditingController _petCategoryController = TextEditingController();
   final TextEditingController _reqDateController = TextEditingController();
+  final TextEditingController _requesterNameController = TextEditingController();
 
   void _submitRequest() {
     FirebaseFirestore.instance.collection('requests').add({
@@ -19,6 +20,7 @@ class _RequestsPageState extends State<RequestsPage> {
       'careDetails': _careDetailsController.text,
       'petCategory': _petCategoryController.text,
       'reqDate': _reqDateController.text,
+      'requesterName': _requesterNameController.text,
       'timestamp': FieldValue.serverTimestamp(),
     }).then((value) {
       setState(() {
@@ -26,6 +28,7 @@ class _RequestsPageState extends State<RequestsPage> {
         _careDetailsController.clear();
         _petCategoryController.clear();
         _reqDateController.clear();
+        _requesterNameController.clear();
       });
     });
   }
@@ -42,44 +45,29 @@ class _RequestsPageState extends State<RequestsPage> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 TextFormField(
+                  controller: _requesterNameController,
+                  decoration: InputDecoration(labelText: 'Your Name'),
+                  validator: (value) => value!.isEmpty ? 'Please enter your name' : null,
+                ),
+                TextFormField(
                   controller: _petNameController,
                   decoration: InputDecoration(labelText: 'Pet Name'),
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Please enter the pet name';
-                    }
-                    return null;
-                  },
+                  validator: (value) => value!.isEmpty ? 'Please enter the pet name' : null,
                 ),
                 TextFormField(
                   controller: _careDetailsController,
                   decoration: InputDecoration(labelText: 'Care Details'),
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Please enter care details';
-                    }
-                    return null;
-                  },
+                  validator: (value) => value!.isEmpty ? 'Please enter care details' : null,
                 ),
                 TextFormField(
                   controller: _petCategoryController,
                   decoration: InputDecoration(labelText: 'Pet Category'),
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Please enter the pet category';
-                    }
-                    return null;
-                  },
+                  validator: (value) => value!.isEmpty ? 'Please enter the pet category' : null,
                 ),
                 TextFormField(
                   controller: _reqDateController,
                   decoration: InputDecoration(labelText: 'Request Date'),
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Please enter the request date';
-                    }
-                    return null;
-                  },
+                  validator: (value) => value!.isEmpty ? 'Please enter the request date' : null,
                 ),
               ],
             ),
@@ -95,9 +83,7 @@ class _RequestsPageState extends State<RequestsPage> {
               child: Text('Submit'),
             ),
             TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-              },
+              onPressed: () => Navigator.of(context).pop(),
               child: Text('Cancel'),
             ),
           ],
@@ -131,21 +117,35 @@ class _RequestsPageState extends State<RequestsPage> {
             final careDetails = request['careDetails'];
             final petCategory = request['petCategory'];
             final reqDate = request['reqDate'];
+            final requesterName = request['requesterName'];
             final timestamp = request['timestamp']?.toDate();
 
             return Card(
               margin: EdgeInsets.all(8),
-              elevation: 4,
-              child: ListTile(
-                contentPadding: EdgeInsets.all(16),
-                title: Text(petName, style: TextStyle(fontWeight: FontWeight.bold)),
-                subtitle: Column(
+              elevation: 6,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              child: Padding(
+                padding: EdgeInsets.all(16),
+                child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Care Details: $careDetails'),
-                    Text('Category: $petCategory'),
-                    Text('Request Date: $reqDate'),
-                    Text('Timestamp: ${timestamp?.toLocal()}'),
+                    Text(
+                      requesterName,
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.teal),
+                    ),
+                    SizedBox(height: 8),
+                    Text('Pet Name: $petName', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                    SizedBox(height: 4),
+                    Text('Category: $petCategory', style: TextStyle(fontSize: 14, color: Colors.grey[700])),
+                    SizedBox(height: 4),
+                    Text('Care Details: $careDetails', style: TextStyle(fontSize: 14)),
+                    SizedBox(height: 4),
+                    Text('Request Date: $reqDate', style: TextStyle(fontSize: 14, color: Colors.grey[700])),
+                    if (timestamp != null)
+                      Text(
+                        'Submitted: ${timestamp.toLocal()}'.split('.')[0],
+                        style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                      ),
                   ],
                 ),
               ),
@@ -161,16 +161,14 @@ class _RequestsPageState extends State<RequestsPage> {
     return Scaffold(
       body: Column(
         children: [
-          Expanded(
-            child: _buildRequestList(),
-          ),
+          Expanded(child: _buildRequestList()),
         ],
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: _showFormDialog,
         child: Icon(Icons.add),
         tooltip: 'Add Request',
-        backgroundColor: Color(0xFF009688), // Set the color to #009688FF
+        backgroundColor: Color(0xFF009688),
       ),
     );
   }
