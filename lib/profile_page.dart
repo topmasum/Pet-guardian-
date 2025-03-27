@@ -32,7 +32,7 @@ class ProfilePage extends StatelessWidget {
 
         // Extract user info
         var userData = snapshot.data!;
-        String name = userData['name'] ?? 'Unknown';
+        String name = userData['username'] ?? 'Unknown';
         String email = userData['email'] ?? 'No Email';
         String profileImage = userData['profileImage'] ?? 'assets/images/profile_placeholder.png';
 
