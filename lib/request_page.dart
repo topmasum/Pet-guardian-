@@ -105,75 +105,91 @@ class _RequestsPageState extends State<RequestsPage> {
           content: SingleChildScrollView(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 8.0),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
+              child: StatefulBuilder(
+                builder: (context, setStateSB) {
+                  return Form(
+                    key: _formKey,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                      _buildTextField(_petNameController, 'Pet Name', 'Enter your petsname'),
+                    DropdownButtonFormField<String>(
+                    decoration: InputDecoration(
+                      labelText: 'Pet Category',
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    value: _selectedPetCategory,
+                    items: ['Dog', 'Cat', 'Bird', 'Others'].map((category) {
+                      return DropdownMenuItem<String>(
+                        value: category,
+                        child: Text(category),
+                      );
+                    }).toList(),
+                    onChanged: (value) {
+                      setStateSB(() {
+                        _selectedPetCategory = value!;
+                      });
+                    },
+                  ),
+                  SizedBox(height: 15),
+                  _buildTextField(_careDetailsController, 'Care Details', 'Enter care details'),
+                  InkWell(
+                  onTap: () async {
+                  DateTime? pickedDate = await showDatePicker(
+                  context: context,
+                  initialDate: DateTime.now(),
+                  firstDate: DateTime.now(),
+                  lastDate: DateTime(2100),
+                  );
+                  if (pickedDate != null) {
+                  setStateSB(() {
+                  _selectedDate = pickedDate;
+                  });
+                  }
+                  },
+                  child: InputDecorator(
+                  decoration: InputDecoration(
+                  labelText: 'Request Date',
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    _buildTextField(_petNameController, 'Pet Name', 'Enter your pet’s name'),
-                    DropdownButtonFormField<String>(
-                      decoration: InputDecoration(
-                        labelText: 'Pet Category',
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                      ),
-                      value: _selectedPetCategory,
-                      items: ['Dog', 'Cat', 'Bird', 'Others'].map((category) {
-                        return DropdownMenuItem<String>(
-                          value: category,
-                          child: Text(category),
-                        );
-                      }).toList(),
-                      onChanged: (value) {
-                        setState(() {
-                          _selectedPetCategory = value!;
-                        });
-                      },
-                    ),
-                    SizedBox(height: 15),
-                    _buildTextField(_careDetailsController, 'Care Details', 'Enter care details'),
-                    InkWell(
-                      onTap: () => _pickDate(context),
-                      child: InputDecorator(
-                        decoration: InputDecoration(
-                          labelText: 'Request Date',
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              _selectedDate != null
-                                  ? DateFormat('yyyy-MM-dd').format(_selectedDate!)
-                                  : 'Select a date',
-                              style: TextStyle(fontSize: 16),
-                            ),
-                            Icon(Icons.calendar_today, color: Colors.teal),
-                          ],
-                        ),
-                      ),
-                    ),
-                    SizedBox(height: 15),
-                    DropdownButtonFormField<String>(
-                      decoration: InputDecoration(
-                        labelText: 'Location',
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                      ),
-                      value: _selectedLocation,
-                      items: locations.map((location) {
-                        return DropdownMenuItem<String>(
-                          value: location,
-                          child: Text(location),
-                        );
-                      }).toList(),
-                      onChanged: (value) {
-                        setState(() {
-                          _selectedLocation = value!;
-                        });
-                      },
-                    ),
-                    SizedBox(height: 20),
+                  Text(
+                  _selectedDate != null
+                  ? DateFormat('yyyy-MM-dd').format(_selectedDate!)
+                      : 'Select a date',
+                  style: TextStyle(fontSize: 16),
+                  ),
+                  Icon(Icons.calendar_today, color: Colors.teal),
                   ],
-                ),
+                  ),
+                  ),
+                  ),
+                  SizedBox(height: 15),
+                  DropdownButtonFormField<String>(
+                  decoration: InputDecoration(
+                  labelText: 'Location',
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  value: _selectedLocation,
+                  items: locations.map((location) {
+                  return DropdownMenuItem<String>(
+                  value: location,
+                  child: Text(location),
+                  );
+                  }).toList(),
+                  onChanged: (value) {
+                  setStateSB(() {
+                  _selectedLocation = value!;
+                  });
+                  },
+                  ),
+                  SizedBox(height: 20),
+                  ],
+                  ),
+                  );
+                },
               ),
             ),
           ),
@@ -241,6 +257,84 @@ class _RequestsPageState extends State<RequestsPage> {
     }
   }
 
+  Future<bool> checkIfBooked(String requestId) async {
+    User? user = FirebaseAuth.instance.currentUser;
+    if (user == null) return false;
+
+    QuerySnapshot snapshot = await FirebaseFirestore.instance
+        .collection('bookings')
+        .where('userId', isEqualTo: user.uid)
+        .where('requestId', isEqualTo: requestId)
+        .limit(1)
+        .get();
+
+    return snapshot.docs.isNotEmpty;
+  }
+
+  void _handleBookNow(String requestId, String requesterId) async {
+    User? currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser == null) return;
+
+    bool? confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Confirm Booking'),
+        content: Text('Are you sure you want to book this request?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text('No'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: Text('Yes'),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.teal),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      try {
+        // Get the request details first
+        DocumentSnapshot requestDoc = await FirebaseFirestore.instance
+            .collection('requests')
+            .doc(requestId)
+            .get();
+
+        if (requestDoc.exists) {
+          Map<String, dynamic> requestData = requestDoc.data() as Map<String, dynamic>;
+
+          // Create a booking document
+          await FirebaseFirestore.instance.collection('bookings').add({
+            'userId': currentUser.uid,
+            'requestId': requestId,
+            'requesterId': requesterId,
+            'petName': requestData['petName'],
+            'petCategory': requestData['petCategory'],
+            'careDetails': requestData['careDetails'],
+            'location': requestData['location'],
+            'reqDate': requestData['reqDate'],
+            'bookingDate': FieldValue.serverTimestamp(),
+            'status': 'Applied',
+          });
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Booking applied successfully!')),
+          );
+
+          // Refresh the UI
+          setState(() {});
+        }
+      } catch (e) {
+        print("Error creating booking: $e");
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to apply booking')),
+        );
+      }
+    }
+  }
+
   Stream<QuerySnapshot> getFilteredStream() {
     CollectionReference ref = FirebaseFirestore.instance.collection('requests');
     Query query = ref.orderBy('timestamp', descending: true);
@@ -303,7 +397,6 @@ class _RequestsPageState extends State<RequestsPage> {
     );
   }
 
-
   Widget _buildRequestList() {
     return StreamBuilder(
       stream: getFilteredStream(),
@@ -344,7 +437,7 @@ class _RequestsPageState extends State<RequestsPage> {
                       onTap: () => _showRequesterProfile(userId),
                       child: Text(
                         'Requester: $requester',
-                        style: TextStyle(fontStyle: FontStyle.italic, color: Colors.blue, decoration: TextDecoration.underline),
+                        style: TextStyle(fontStyle: FontStyle.italic, color: Colors.blue),
                       ),
                     ),
                     Text('Category: $petCategory'),
@@ -354,12 +447,21 @@ class _RequestsPageState extends State<RequestsPage> {
                     SizedBox(height: 10),
                     Align(
                       alignment: Alignment.centerRight,
-                      child: ElevatedButton(
-                        onPressed: () {
-                          print("Booking for $petName");
+                      child: FutureBuilder<bool>(
+                        future: checkIfBooked(request.id),
+                        builder: (context, snapshot) {
+                          bool isBooked = snapshot.data ?? false;
+                          return ElevatedButton(
+                            onPressed: isBooked ? null : () => _handleBookNow(request.id, userId),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: isBooked ? Colors.grey : Colors.teal,
+                            ),
+                            child: Text(
+                              isBooked ? 'Applied' : 'Book Now',
+                              style: TextStyle(color: Colors.white),
+                            ),
+                          );
                         },
-                        style: ElevatedButton.styleFrom(backgroundColor: Colors.teal),
-                        child: Text('Book Now', style: TextStyle(color: Colors.white)),
                       ),
                     ),
                   ],
@@ -391,8 +493,7 @@ class _RequestsPageState extends State<RequestsPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: Colors.teal,
-        title: Text("Requests"),
+        automaticallyImplyLeading: false,
         actions: [
           PopupMenuButton<String>(
             icon: Icon(Icons.filter_list),
