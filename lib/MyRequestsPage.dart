@@ -22,25 +22,12 @@ class _MyRequestsPageState extends State<MyRequestsPage> {
   Future<List<DocumentSnapshot>> getRequests() async {
     try {
       var user = _auth.currentUser;
-      print('[DEBUG] Current user UID: ${user?.uid}');
-
-      if (user == null) {
-        print('[DEBUG] No user logged in');
-        return [];
-      }
-
-      print('[DEBUG] Fetching requests for user ${user.uid}');
+      if (user == null) return [];
 
       QuerySnapshot snapshot = await _firestore
           .collection('requests')
           .where('userId', isEqualTo: user.uid)
           .get();
-
-      print('[DEBUG] Found ${snapshot.docs.length} requests');
-
-      for (var doc in snapshot.docs) {
-        print('[DEBUG] Request ID: ${doc.id} - Data: ${doc.data()}');
-      }
 
       return snapshot.docs;
     } catch (e) {
@@ -51,22 +38,16 @@ class _MyRequestsPageState extends State<MyRequestsPage> {
 
   Future<List<Map<String, dynamic>>> fetchApplicants(String requestId) async {
     try {
-      print('[DEBUG] Fetching applicants for request $requestId');
-
       final bookingsSnapshot = await _firestore
           .collection('bookings')
           .where('requestId', isEqualTo: requestId)
           .get();
-
-      print('[DEBUG] Found ${bookingsSnapshot.docs.length} bookings');
 
       List<Map<String, dynamic>> applicants = [];
 
       for (var bookingDoc in bookingsSnapshot.docs) {
         var bookingData = bookingDoc.data() as Map<String, dynamic>;
         var applicantId = bookingData['userId'];
-
-        print('[DEBUG] Fetching user details for applicant $applicantId');
 
         var userDoc = await _firestore.collection('users').doc(applicantId).get();
 
@@ -89,9 +70,55 @@ class _MyRequestsPageState extends State<MyRequestsPage> {
     }
   }
 
+  Future<void> _updateBookingStatus(String bookingId, String status) async {
+    try {
+      await _firestore.collection('bookings').doc(bookingId).update({
+        'status': status,
+        'processedAt': Timestamp.now(),
+      });
+
+      var bookingDoc = await _firestore.collection('bookings').doc(bookingId).get();
+      var bookingData = bookingDoc.data() as Map<String, dynamic>;
+      var requestDoc = await _firestore.collection('requests').doc(bookingData['requestId']).get();
+      var requestData = requestDoc.data() as Map<String, dynamic>;
+
+      await _sendStatusNotification(
+        bookingData['userId'],
+        requestData['petName'] ?? 'your pet',
+        status,
+      );
+
+      setState(() {
+        _futureRequests = getRequests();
+      });
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to update status: $e')),
+      );
+    }
+  }
+
+  Future<void> _sendStatusNotification(String userId, String petName, String status) async {
+    try {
+      var userDoc = await _firestore.collection('users').doc(_auth.currentUser!.uid).get();
+      var userName = userDoc['username'] ?? 'The pet owner';
+
+      await _firestore.collection('notifications').add({
+        'userId': userId,
+        'title': 'Booking $status',
+        'message': '$userName has $status your application for $petName',
+        'type': 'status_update',
+        'read': false,
+        'timestamp': Timestamp.now(),
+        'relatedId': '',
+      });
+    } catch (e) {
+      print('Error sending status notification: $e');
+    }
+  }
+
   Future<void> _deleteRequest(String requestId) async {
     try {
-      // First delete all bookings associated with this request
       final bookings = await _firestore
           .collection('bookings')
           .where('requestId', isEqualTo: requestId)
@@ -101,10 +128,8 @@ class _MyRequestsPageState extends State<MyRequestsPage> {
         await booking.reference.delete();
       }
 
-      // Then delete the request itself
       await _firestore.collection('requests').doc(requestId).delete();
 
-      // Refresh the list
       setState(() {
         _futureRequests = getRequests();
       });
@@ -131,7 +156,6 @@ class _MyRequestsPageState extends State<MyRequestsPage> {
           }
 
           if (snapshot.hasError) {
-            print('[ERROR] FutureBuilder error: ${snapshot.error}');
             return Center(child: Text('Error loading requests. Please try again.'));
           }
 
@@ -155,152 +179,210 @@ class _MyRequestsPageState extends State<MyRequestsPage> {
 
           var requests = snapshot.data!;
 
-          return ListView.builder(
-            itemCount: requests.length,
-            itemBuilder: (context, index) {
-              var request = requests[index].data() as Map<String, dynamic>;
-              String requestId = requests[index].id;
-              bool isExpanded = expandedCards.contains(requestId);
+          return RefreshIndicator(
+            onRefresh: () async {
+              setState(() {
+                _futureRequests = getRequests();
+              });
+            },
+            child: ListView.builder(
+              itemCount: requests.length,
+              itemBuilder: (context, index) {
+                var request = requests[index].data() as Map<String, dynamic>;
+                String requestId = requests[index].id;
+                bool isExpanded = expandedCards.contains(requestId);
 
-              return Card(
-                margin: EdgeInsets.all(10),
-                elevation: 5,
-                child: InkWell(
-                  onTap: () {
-                    setState(() {
-                      if (isExpanded) {
-                        expandedCards.remove(requestId);
-                      } else {
-                        expandedCards.add(requestId);
-                      }
-                    });
-                  },
-                  child: Padding(
-                    padding: const EdgeInsets.all(12.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        ListTile(
-                          title: Text(
-                            request['petName'] ?? 'Unnamed Pet',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 18,
+                return Card(
+                  margin: EdgeInsets.all(10),
+                  elevation: 5,
+                  child: InkWell(
+                    onTap: () {
+                      setState(() {
+                        if (isExpanded) {
+                          expandedCards.remove(requestId);
+                        } else {
+                          expandedCards.add(requestId);
+                        }
+                      });
+                    },
+                    child: Padding(
+                      padding: const EdgeInsets.all(12.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          ListTile(
+                            title: Text(
+                              request['petName'] ?? 'Unnamed Pet',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 18,
+                              ),
                             ),
-                          ),
-                          subtitle: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text('Category: ${request['petCategory'] ?? 'Unknown'}'),
-                              Text('Location: ${request['location'] ?? 'Unknown'}'),
-                              Text('Date: ${request['reqDate'] ?? 'Unknown'}'),
-                            ],
-                          ),
-                          trailing: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              IconButton(
-                                icon: Icon(Icons.delete, color: Colors.red),
-                                onPressed: () => _showDeleteDialog(requestId),
-                              ),
-                              Icon(
-                                isExpanded ? Icons.expand_less : Icons.expand_more,
-                                color: Colors.blue,
-                              ),
-                            ],
-                          ),
-                        ),
-                        if (isExpanded)
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                            child: Column(
+                            subtitle: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Divider(),
-                                Text(
-                                  'Care Details:',
-                                  style: TextStyle(fontWeight: FontWeight.bold),
+                                Text('Category: ${request['petCategory'] ?? 'Unknown'}'),
+                                Text('Location: ${request['location'] ?? 'Unknown'}'),
+                                Text('Date: ${request['reqDate'] ?? 'Unknown'}'),
+                              ],
+                            ),
+                            trailing: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                IconButton(
+                                  icon: Icon(Icons.delete, color: Colors.red),
+                                  onPressed: () => _showDeleteDialog(requestId),
                                 ),
-                                Text(request['careDetails'] ?? 'No details provided'),
-                                SizedBox(height: 16),
-                                Text(
-                                  'Applicants:',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 16,
-                                  ),
-                                ),
-                                SizedBox(height: 8),
-                                FutureBuilder<List<Map<String, dynamic>>>(
-                                  future: fetchApplicants(requestId),
-                                  builder: (context, applicantSnapshot) {
-                                    if (applicantSnapshot.connectionState ==
-                                        ConnectionState.waiting) {
-                                      return Padding(
-                                        padding: const EdgeInsets.all(8.0),
-                                        child: Center(child: CircularProgressIndicator()),
-                                      );
-                                    }
-
-                                    if (applicantSnapshot.hasError) {
-                                      return Text('Error loading applicants');
-                                    }
-
-                                    if (!applicantSnapshot.hasData ||
-                                        applicantSnapshot.data!.isEmpty) {
-                                      return Padding(
-                                        padding: const EdgeInsets.all(8.0),
-                                        child: Text('No applicants yet'),
-                                      );
-                                    }
-
-                                    return Column(
-                                      children: applicantSnapshot.data!.map((applicant) {
-                                        return Card(
-                                          margin: EdgeInsets.only(bottom: 8),
-                                          child: Padding(
-                                            padding: const EdgeInsets.all(12.0),
-                                            child: Column(
-                                              crossAxisAlignment: CrossAxisAlignment.start,
-                                              children: [
-                                                Text(
-                                                  applicant['name'],
-                                                  style: TextStyle(
-                                                    fontWeight: FontWeight.bold,
-                                                  ),
-                                                ),
-                                                SizedBox(height: 4),
-                                                Text(applicant['email']),
-                                                SizedBox(height: 4),
-                                                Text(applicant['phone']),
-                                                SizedBox(height: 4),
-                                                Text(
-                                                  'Status: ${applicant['status']}',
-                                                  style: TextStyle(
-                                                    color: applicant['status'] == 'Approved'
-                                                        ? Colors.green
-                                                        : Colors.orange,
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                        );
-                                      }).toList(),
-                                    );
-                                  },
+                                Icon(
+                                  isExpanded ? Icons.expand_less : Icons.expand_more,
+                                  color: Colors.blue,
                                 ),
                               ],
                             ),
                           ),
-                      ],
+                          if (isExpanded)
+                            Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Divider(),
+                                  Text('Care Details:', style: TextStyle(fontWeight: FontWeight.bold)),
+                                  Text(request['careDetails'] ?? 'No details provided'),
+                                  SizedBox(height: 16),
+                                  Text('Applicants:', style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 16,
+                                  )),
+                                  SizedBox(height: 8),
+                                  FutureBuilder<List<Map<String, dynamic>>>(
+                                    future: fetchApplicants(requestId),
+                                    builder: (context, applicantSnapshot) {
+                                      if (applicantSnapshot.connectionState == ConnectionState.waiting) {
+                                        return Padding(
+                                          padding: const EdgeInsets.all(8.0),
+                                          child: Center(child: CircularProgressIndicator()),
+                                        );
+                                      }
+
+                                      if (applicantSnapshot.hasError) {
+                                        return Padding(
+                                          padding: const EdgeInsets.all(8.0),
+                                          child: Text('Error loading applicants'),
+                                        );
+                                      }
+
+                                      if (!applicantSnapshot.hasData || applicantSnapshot.data!.isEmpty) {
+                                        return Padding(
+                                          padding: const EdgeInsets.all(8.0),
+                                          child: Text('No applicants yet'),
+                                        );
+                                      }
+
+                                      return ListView.builder(
+                                        physics: NeverScrollableScrollPhysics(),
+                                        shrinkWrap: true,
+                                        itemCount: applicantSnapshot.data!.length,
+                                        itemBuilder: (context, index) {
+                                          var applicant = applicantSnapshot.data![index];
+                                          return Container(
+                                            margin: EdgeInsets.only(bottom: 8),
+                                            decoration: BoxDecoration(
+                                              border: Border.all(color: Colors.grey[300]!),
+                                              borderRadius: BorderRadius.circular(8),
+                                            ),
+                                            child: Padding(
+                                              padding: const EdgeInsets.all(12.0),
+                                              child: Column(
+                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                children: [
+                                                  Row(
+                                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                                    children: [
+                                                      Text(
+                                                        applicant['name'],
+                                                        style: TextStyle(
+                                                          fontWeight: FontWeight.bold,
+                                                          fontSize: 16,
+                                                        ),
+                                                      ),
+                                                      Container(
+                                                        padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                                        decoration: BoxDecoration(
+                                                          color: applicant['status'] == 'Approved'
+                                                              ? Colors.green.withOpacity(0.2)
+                                                              : applicant['status'] == 'Rejected'
+                                                              ? Colors.red.withOpacity(0.2)
+                                                              : Colors.orange.withOpacity(0.2),
+                                                          borderRadius: BorderRadius.circular(12),
+                                                        ),
+                                                        child: Text(
+                                                          applicant['status'],
+                                                          style: TextStyle(
+                                                            color: applicant['status'] == 'Approved'
+                                                                ? Colors.green
+                                                                : applicant['status'] == 'Rejected'
+                                                                ? Colors.red
+                                                                : Colors.orange,
+                                                          ),
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                  SizedBox(height: 8),
+                                                  _buildDetailRow(Icons.email, applicant['email']),
+                                                  _buildDetailRow(Icons.phone, applicant['phone']),
+                                                  if (applicant['status'] == 'Applied')
+                                                    Row(
+                                                      mainAxisAlignment: MainAxisAlignment.end,
+                                                      children: [
+                                                        TextButton(
+                                                          onPressed: () => _updateBookingStatus(applicant['bookingId'], 'Rejected'),
+                                                          child: Text('Reject', style: TextStyle(color: Colors.red)),
+                                                        ),
+                                                        SizedBox(width: 12),
+                                                        ElevatedButton(
+                                                          onPressed: () => _updateBookingStatus(applicant['bookingId'], 'Approved'),
+                                                          style: ElevatedButton.styleFrom(
+                                                            backgroundColor: Colors.green,
+                                                          ),
+                                                          child: Text('Approve',style: TextStyle(color: Colors.white)),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                ],
+                                              ),
+                                            ),
+                                          );
+                                        },
+                                      );
+                                    },
+                                  ),
+                                ],
+                              ),
+                            ),
+                        ],
+                      ),
                     ),
                   ),
-                ),
-              );
-            },
+                );
+              },
+            ),
           );
         },
+      ),
+    );
+  }
+
+  Widget _buildDetailRow(IconData icon, String text) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4.0),
+      child: Row(
+        children: [
+          Icon(icon, size: 20, color: Colors.grey),
+          SizedBox(width: 8),
+          Expanded(child: Text(text)),
+        ],
       ),
     );
   }

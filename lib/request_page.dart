@@ -112,82 +112,82 @@ class _RequestsPageState extends State<RequestsPage> {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                      _buildTextField(_petNameController, 'Pet Name', 'Enter your petsname'),
-                    DropdownButtonFormField<String>(
-                    decoration: InputDecoration(
-                      labelText: 'Pet Category',
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                        _buildTextField(_petNameController, 'Pet Name', 'Enter your petsname'),
+                        DropdownButtonFormField<String>(
+                          decoration: InputDecoration(
+                            labelText: 'Pet Category',
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                          value: _selectedPetCategory,
+                          items: ['Dog', 'Cat', 'Bird', 'Others'].map((category) {
+                            return DropdownMenuItem<String>(
+                              value: category,
+                              child: Text(category),
+                            );
+                          }).toList(),
+                          onChanged: (value) {
+                            setStateSB(() {
+                              _selectedPetCategory = value!;
+                            });
+                          },
+                        ),
+                        SizedBox(height: 15),
+                        _buildTextField(_careDetailsController, 'Care Details', 'Enter care details'),
+                        InkWell(
+                          onTap: () async {
+                            DateTime? pickedDate = await showDatePicker(
+                              context: context,
+                              initialDate: DateTime.now(),
+                              firstDate: DateTime.now(),
+                              lastDate: DateTime(2100),
+                            );
+                            if (pickedDate != null) {
+                              setStateSB(() {
+                                _selectedDate = pickedDate;
+                              });
+                            }
+                          },
+                          child: InputDecorator(
+                            decoration: InputDecoration(
+                              labelText: 'Request Date',
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  _selectedDate != null
+                                      ? DateFormat('yyyy-MM-dd').format(_selectedDate!)
+                                      : 'Select a date',
+                                  style: TextStyle(fontSize: 16),
+                                ),
+                                Icon(Icons.calendar_today, color: Colors.teal),
+                              ],
+                            ),
+                          ),
+                        ),
+                        SizedBox(height: 15),
+                        DropdownButtonFormField<String>(
+                          decoration: InputDecoration(
+                            labelText: 'Location',
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                          value: _selectedLocation,
+                          items: locations.map((location) {
+                            return DropdownMenuItem<String>(
+                              value: location,
+                              child: Text(location),
+                            );
+                          }).toList(),
+                          onChanged: (value) {
+                            setStateSB(() {
+                              _selectedLocation = value!;
+                            });
+                          },
+                        ),
+                        SizedBox(height: 20),
+                      ],
                     ),
-                    value: _selectedPetCategory,
-                    items: ['Dog', 'Cat', 'Bird', 'Others'].map((category) {
-                      return DropdownMenuItem<String>(
-                        value: category,
-                        child: Text(category),
-                      );
-                    }).toList(),
-                    onChanged: (value) {
-                      setStateSB(() {
-                        _selectedPetCategory = value!;
-                      });
-                    },
-                  ),
-                  SizedBox(height: 15),
-                  _buildTextField(_careDetailsController, 'Care Details', 'Enter care details'),
-                  InkWell(
-                  onTap: () async {
-                  DateTime? pickedDate = await showDatePicker(
-                  context: context,
-                  initialDate: DateTime.now(),
-                  firstDate: DateTime.now(),
-                  lastDate: DateTime(2100),
-                  );
-                  if (pickedDate != null) {
-                  setStateSB(() {
-                  _selectedDate = pickedDate;
-                  });
-                  }
-                  },
-                  child: InputDecorator(
-                  decoration: InputDecoration(
-                  labelText: 'Request Date',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                  ),
-                  child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                  Text(
-                  _selectedDate != null
-                  ? DateFormat('yyyy-MM-dd').format(_selectedDate!)
-                      : 'Select a date',
-                  style: TextStyle(fontSize: 16),
-                  ),
-                  Icon(Icons.calendar_today, color: Colors.teal),
-                  ],
-                  ),
-                  ),
-                  ),
-                  SizedBox(height: 15),
-                  DropdownButtonFormField<String>(
-                  decoration: InputDecoration(
-                  labelText: 'Location',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                  ),
-                  value: _selectedLocation,
-                  items: locations.map((location) {
-                  return DropdownMenuItem<String>(
-                  value: location,
-                  child: Text(location),
-                  );
-                  }).toList(),
-                  onChanged: (value) {
-                  setStateSB(() {
-                  _selectedLocation = value!;
-                  });
-                  },
-                  ),
-                  SizedBox(height: 20),
-                  ],
-                  ),
                   );
                 },
               ),
