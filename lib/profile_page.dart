@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'MyRequestsPage.dart'; // Import the page to show requested cards
-import 'MyBookingsPage.dart'; // Import the page to show booking cards
+import 'MyRequestsPage.dart';
+import 'MyBookingsPage.dart';
+import 'NotificationsPage.dart'; // Add this import for the notifications page
 
 class ProfilePage extends StatelessWidget {
   final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -102,6 +103,61 @@ class ProfilePage extends StatelessWidget {
                         padding: const EdgeInsets.all(20.0),
                         child: Column(
                           children: [
+                            // Notification Button with Badge
+                            StreamBuilder<QuerySnapshot>(
+                              stream: _firestore.collection('notifications')
+                                  .where('userId', isEqualTo: _auth.currentUser?.uid)
+                                  .where('read', isEqualTo: false)
+                                  .snapshots(),
+                              builder: (context, notificationSnapshot) {
+                                int unreadCount = notificationSnapshot.hasData
+                                    ? notificationSnapshot.data!.docs.length
+                                    : 0;
+
+                                return Stack(
+                                  children: [
+                                    ElevatedButton.icon(
+                                      onPressed: () {
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(builder: (context) => NotificationsPage()),
+                                        );
+                                      },
+                                      icon: Icon(Icons.notifications, color: Colors.white),
+                                      label: Text('Notifications', style: TextStyle(fontSize: 16, color: Colors.white)),
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: Colors.teal,
+                                        padding: EdgeInsets.symmetric(horizontal: 30, vertical: 15),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(30),
+                                        ),
+                                      ),
+                                    ),
+                                    if (unreadCount > 0)
+                                      Positioned(
+                                        right: 8,
+                                        top: 8,
+                                        child: Container(
+                                          padding: EdgeInsets.all(4),
+                                          decoration: BoxDecoration(
+                                            color: Colors.red,
+                                            shape: BoxShape.circle,
+                                          ),
+                                          child: Text(
+                                            unreadCount.toString(),
+                                            style: TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 12,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                  ],
+                                );
+                              },
+                            ),
+                            SizedBox(height: 10),
+
                             // Edit Profile Button
                             ElevatedButton.icon(
                               onPressed: () {
@@ -117,7 +173,7 @@ class ProfilePage extends StatelessWidget {
                                 ),
                               ),
                             ),
-                            SizedBox(height: 20),
+                            SizedBox(height: 10),
 
                             // My Requests Button
                             ElevatedButton.icon(
