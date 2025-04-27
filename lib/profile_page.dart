@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'EditProfilePage.dart';
 import 'MyRequestsPage.dart';
 import 'MyBookingsPage.dart';
 import 'NotificationsPage.dart'; // Add this import for the notifications page
@@ -47,53 +48,57 @@ class ProfilePage extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    // Profile Header Section
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(10),
-                      child: Container(
-                        height: 220,
-                        width: double.infinity,
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [Colors.teal, Colors.blue],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
+                    // Profile Header Section with Animation
+                    AnimatedContainer(
+                      duration: Duration(seconds: 1),
+                      curve: Curves.easeInOut,
+                      height: 220,
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [Colors.teal, Colors.blue],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
                         ),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            CircleAvatar(
+                        borderRadius: BorderRadius.circular(15),
+                      ),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          AnimatedContainer(
+                            duration: Duration(seconds: 1),
+                            curve: Curves.easeInOut,
+                            child: CircleAvatar(
                               radius: 60,
                               backgroundImage: profileImage.startsWith('http')
                                   ? NetworkImage(profileImage) as ImageProvider
                                   : AssetImage(profileImage),
                             ),
-                            SizedBox(height: 15),
-                            Text(
-                              name,
-                              style: TextStyle(
-                                fontSize: 24,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
-                                fontFamily: 'OpenSans',
-                              ),
+                          ),
+                          SizedBox(height: 15),
+                          Text(
+                            name,
+                            style: TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                              fontFamily: 'OpenSans',
                             ),
-                            SizedBox(height: 5),
-                            Text(
-                              email,
-                              style: TextStyle(
-                                fontSize: 16,
-                                color: Colors.white70,
-                              ),
+                          ),
+                          SizedBox(height: 5),
+                          Text(
+                            email,
+                            style: TextStyle(
+                              fontSize: 16,
+                              color: Colors.white70,
                             ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
                     ),
                     SizedBox(height: 20),
 
-                    // Profile Action Buttons
+                    // Profile Action Buttons with hover effects
                     Card(
                       elevation: 5,
                       shape: RoundedRectangleBorder(
@@ -158,10 +163,13 @@ class ProfilePage extends StatelessWidget {
                             ),
                             SizedBox(height: 10),
 
-                            // Edit Profile Button
+                            // Edit Profile Button with hover effect
                             ElevatedButton.icon(
                               onPressed: () {
-                                // Navigate to profile edit page
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(builder: (context) => EditProfilePage()),
+                                );
                               },
                               icon: Icon(Icons.edit, color: Colors.white),
                               label: Text('Edit Profile', style: TextStyle(fontSize: 16, color: Colors.white)),
@@ -175,7 +183,7 @@ class ProfilePage extends StatelessWidget {
                             ),
                             SizedBox(height: 10),
 
-                            // My Requests Button
+                            // My Requests Button with hover effect
                             ElevatedButton.icon(
                               onPressed: () {
                                 Navigator.push(
@@ -195,7 +203,7 @@ class ProfilePage extends StatelessWidget {
                             ),
                             SizedBox(height: 10),
 
-                            // My Bookings Button
+                            // My Bookings Button with hover effect
                             ElevatedButton.icon(
                               onPressed: () {
                                 Navigator.push(
