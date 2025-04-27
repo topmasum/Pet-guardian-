@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'MyRequestsPage.dart';
 import 'MyBookingsPage.dart';
 import 'NotificationsPage.dart';
+import 'EditProfilePage.dart';
 import 'help.dart';
 
 class ProfilePage extends StatelessWidget {
@@ -30,9 +31,11 @@ class ProfilePage extends StatelessWidget {
         future: getUserData(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return Center(child: CircularProgressIndicator(
-              valueColor: AlwaysStoppedAnimation<Color>(Colors.teal),
-            ));
+            return Center(
+              child: CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation<Color>(Colors.teal),
+              ),
+            );
           } else if (snapshot.hasError) {
             return Center(
               child: Column(
@@ -50,8 +53,7 @@ class ProfilePage extends StatelessWidget {
                     onPressed: () => Navigator.of(context).pushReplacement(
                       MaterialPageRoute(builder: (_) => ProfilePage()),
                     ),
-                    child: Text('Retry',
-                        style: TextStyle(color: Colors.teal)),
+                    child: Text('Retry', style: TextStyle(color: Colors.teal)),
                   ),
                 ],
               ),
@@ -71,297 +73,273 @@ class ProfilePage extends StatelessWidget {
           final rating = userData['rating']?.toDouble() ?? 0.0;
           final ratingCount = userData['ratingCount'] ?? 0;
 
-          return CustomScrollView(
-            slivers: [
-              SliverAppBar(
-                expandedHeight: 280.0,
-                floating: false,
-                pinned: true,
-                flexibleSpace: FlexibleSpaceBar(
-                  background: Container(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [Colors.teal[700]!, Colors.blue[600]!],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.only(top: 70.0),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Stack(
-                            alignment: Alignment.bottomRight,
-                            children: [
-                              Container(
-                                  padding: EdgeInsets.all(4),
-                                  decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    color: Colors.white,
-                                  ),
-                                  child: CircleAvatar(
-                                    radius: 60,
-                                    backgroundImage: profileImage.startsWith('http')
-                                        ? NetworkImage(profileImage) as ImageProvider
-                                        : AssetImage(profileImage),
-                                  ),
-                              ),
+          return SingleChildScrollView(
+              child: Column(
+                  children: [
+              // Header Section
+              Container(
+              padding: EdgeInsets.only(top: MediaQuery.of(context).padding.top + 16),
+          decoration: BoxDecoration(
+          gradient: LinearGradient(
+          colors: [Colors.teal[700]!, Colors.blue[600]!],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.only(
+          bottomLeft: Radius.circular(30),
+          bottomRight: Radius.circular(30),
+          ),
+          ),
+          child: Column(
+          children: [
+          Align(
+          alignment: Alignment.topLeft,
 
-                              if (ratingCount > 0)
-                              Container(
-                                padding: EdgeInsets.symmetric(
-                                    horizontal: 8, vertical: 4),
-                                decoration: BoxDecoration(
-                                  color: Colors.amber[700],
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(Icons.star,
-                                        size: 16, color: Colors.white),
-                                    SizedBox(width: 4),
-                                    Text(
-                                      rating.toStringAsFixed(1),
-                                      style: TextStyle(
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                          SizedBox(height: 16),
-                          Text(
-                            name,
-                            style: TextStyle(
-                              fontSize: 24,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                              fontFamily: 'Montserrat',
-                            ),
-                          ),
-                          SizedBox(height: 4),
-                          Text(
-                            email,
-                            style: TextStyle(
-                              fontSize: 16,
-                              color: Colors.white.withOpacity(0.9),
-                            ),
-                          ),
-                          if (ratingCount > 0)
-                            Padding(
-                              padding: const EdgeInsets.only(top: 4.0),
-                              child: Text(
-                                '${ratingCount} ${ratingCount == 1 ? 'review' : 'reviews'}',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  color: Colors.white.withOpacity(0.8),
-                                ),
-                              ),
-                            ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 20.0, vertical: 20.0),
-                  child: Column(
-                    children: [
-                      _ProfileSectionCard(
-                        title: 'Activity',
-                        children: [
-                          _ProfileActionButton(
-                            icon: Icons.notifications,
-                            label: 'Notifications',
-                            badgeStream: _firestore.collection('notifications')
-                                .where('userId', isEqualTo: _auth.currentUser?.uid)
-                                .where('read', isEqualTo: false)
-                                .snapshots(),
-                            onPressed: () => Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                  builder: (context) => NotificationsPage()),
-                            ),
-                          ),
-                          _ProfileActionButton(
-                            icon: Icons.list_alt,
-                            label: 'My Requests',
-                            onPressed: () => Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                  builder: (context) => MyRequestsPage()),
-                            ),
-                          ),
-                          _ProfileActionButton(
-                            icon: Icons.bookmark,
-                            label: 'My Bookings',
-                            onPressed: () => Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                  builder: (context) => MyBookingsPage()),
-                            ),
-                          ),
-                        ],
-                      ),
-                      SizedBox(height: 20),
-                      _ProfileSectionCard(
-                        title: 'Account',
-                        children: [
-                          _ProfileActionButton(
-                            icon: Icons.edit,
-                            label: 'Edit Profile',
-                            onPressed: () {
-                              // Navigate to profile edit page
-                            },
-                          ),
-                          _ProfileActionButton(
-                            icon: Icons.settings,
-                            label: 'Settings',
-                            onPressed: () {
-                              // Navigate to settings page
-                            },
-                          ),
-                          _ProfileActionButton(
-                            icon: Icons.help_outline,
-                            label: 'Help & Support',
-                              onPressed: () {
-                                Navigator.push(context, MaterialPageRoute(builder: (context) => HelpPage()));
-                              }
-                          ),
-                          _ProfileActionButton(
-                            icon: Icons.exit_to_app,
-                            label: 'Sign Out',
-                            isDestructive: true,
-                            onPressed: () async {
-                              await _auth.signOut();
-                              // Navigate to login screen or handle sign out
-                            },
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
+          ),
+          SizedBox(height: 16),
+          Stack(
+          alignment: Alignment.bottomRight,
+          children: [
+          Container(
+          padding: EdgeInsets.all(6),
+          decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: Colors.white,
+          boxShadow: [
+          BoxShadow(
+          color: Colors.black26,
+          blurRadius: 10,
+          offset: Offset(0, 4),
+          ),
+          ],
+          ),
+          child: CircleAvatar(
+          radius: 60,
+          backgroundImage: profileImage.startsWith('http')
+          ? NetworkImage(profileImage) as ImageProvider
+              : AssetImage(profileImage),
+          ),
+          ),
+          if (ratingCount > 0)
+          Container(
+          padding: EdgeInsets.symmetric(
+          horizontal: 12, vertical: 6),
+          decoration: BoxDecoration(
+          color: Colors.amber[700],
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+          BoxShadow(
+          color: Colors.black12,
+          blurRadius: 6,
+          offset: Offset(0, 2),
+          ),
+          ]),
+
+          child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+          Icon(Icons.star,
+          size: 18, color: Colors.white),
+          SizedBox(width: 4),
+          Text(
+          '${rating.toStringAsFixed(1)} (${ratingCount})',
+          style: TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.bold,
+          fontSize: 14,
+          ),
+          ),
+          ],
+          ),
+          ),
+          ],
+          ),
+          SizedBox(height: 20),
+          Text(
+          name,
+          style: TextStyle(
+          fontSize: 24,
+          fontWeight: FontWeight.bold,
+          color: Colors.white,
+          fontFamily: 'Montserrat',
+          ),
+          ),
+          SizedBox(height: 4),
+          Text(
+          email,
+          style: TextStyle(
+          fontSize: 16,
+          color: Colors.white.withOpacity(0.9),
+          ),
+          ),
+          SizedBox(height: 30),
+          ],
+          ),
+          ),
+          // Content Section
+          Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+          child: Column(
+          children: [
+          // Activity Section
+          _buildSectionCard(
+          context,
+          title: 'Activity',
+          items: [
+          _ProfileItem(
+          icon: Icons.notifications_outlined,
+          label: 'Notifications',
+          badgeStream: _firestore
+              .collection('notifications')
+              .where('userId', isEqualTo: _auth.currentUser?.uid)
+              .where('read', isEqualTo: false)
+              .snapshots(),
+          onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(
+          builder: (context) => NotificationsPage()),
+          ),
+          ),
+          _ProfileItem(
+          icon: Icons.list_alt_outlined,
+          label: 'My Requests',
+          onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(
+          builder: (context) => MyRequestsPage()),
+          ),
+          ),
+          _ProfileItem(
+          icon: Icons.bookmark_outline,
+          label: 'My Bookings',
+          onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(
+          builder: (context) => MyBookingsPage()),
+          ),
+          ),
+          _ProfileItem(
+          icon: Icons.edit_outlined,
+          label: 'Edit Profile',
+          onTap: () {
+          Navigator.push(
+          context,
+          MaterialPageRoute(
+          builder: (context) => EditProfilePage()),
           );
-        },
+          },
+          ),
+          ],
+          ),
+          SizedBox(height: 20),
+          // Account Section
+            _buildSectionCard(
+              context,
+              title: 'Account',
+              items: [
+                _ProfileItem(  // Add this new item
+                  icon: Icons.help_outline,
+                  label: 'Help & Support',
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => HelpPage()),
+                    );
+                  },
+                ),
+                _ProfileItem(
+                  icon: Icons.logout,
+                  label: 'Sign Out',
+                  isDestructive: true,
+                  onTap: () async {
+                    await _auth.signOut();
+                    // Navigate to login screen
+                  },
+                ),
+              ],
+            ),
+          ],
+          ),
+          ),
+          ],
+          ),
+          );
+          },
       ),
     );
   }
-}
 
-class _ProfileSectionCard extends StatelessWidget {
-  final String title;
-  final List<Widget> children;
-
-  const _ProfileSectionCard({
-    required this.title,
-    required this.children,
-  });
-
-  @override
-  Widget build(BuildContext context) {
+  Widget _buildSectionCard(BuildContext context,
+      {required String title, required List<_ProfileItem> items}) {
     return Card(
-      elevation: 2,
+      elevation: 0,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(15),
       ),
+      color: Colors.white,
       child: Padding(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.symmetric(vertical: 8),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Padding(
-              padding: const EdgeInsets.only(left: 8.0, bottom: 8.0),
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
               child: Text(
                 title,
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.w600,
-                  color: Colors.grey[700],
+                  color: Colors.grey[800],
                 ),
               ),
             ),
-            Divider(height: 1),
-            Column(
-              children: children
-                  .map((child) => Padding(
-                padding: const EdgeInsets.symmetric(vertical: 4.0),
-                child: child,
-              ))
-                  .toList(),
-            ),
+            Divider(height: 1, thickness: 0.5),
+            ...items.map((item) => _buildListItem(context, item)).toList(),
           ],
         ),
       ),
     );
   }
-}
 
-class _ProfileActionButton extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final VoidCallback onPressed;
-  final bool isDestructive;
-  final Stream<QuerySnapshot>? badgeStream;
-
-  const _ProfileActionButton({
-    required this.icon,
-    required this.label,
-    required this.onPressed,
-    this.isDestructive = false,
-    this.badgeStream,
-  });
-
-  @override
-  Widget build(BuildContext context) {
+  Widget _buildListItem(BuildContext context, _ProfileItem item) {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        borderRadius: BorderRadius.circular(8),
-        onTap: onPressed,
+        borderRadius: BorderRadius.circular(10),
+        onTap: item.onTap,
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 12.0),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           child: Row(
             children: [
               Container(
                 width: 40,
                 height: 40,
                 decoration: BoxDecoration(
-                  color: isDestructive
+                  color: item.isDestructive
                       ? Colors.red[50]
                       : Colors.teal.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(
-                  icon,
-                  color: isDestructive ? Colors.red[400] : Colors.teal[600],
-                  size: 20,
+                  item.icon,
+                  color: item.isDestructive ? Colors.red[400] : Colors.teal[600],
+                  size: 22,
                 ),
               ),
               SizedBox(width: 16),
               Expanded(
                 child: Text(
-                  label,
+                  item.label,
                   style: TextStyle(
                     fontSize: 16,
-                    color: isDestructive ? Colors.red[400] : Colors.grey[800],
+                    color: item.isDestructive ? Colors.red[400] : Colors.grey[800],
                     fontWeight: FontWeight.w500,
                   ),
                 ),
               ),
-              if (badgeStream != null)
+              if (item.badgeStream != null)
                 StreamBuilder<QuerySnapshot>(
-                  stream: badgeStream,
+                  stream: item.badgeStream,
                   builder: (context, snapshot) {
                     final count = snapshot.hasData ? snapshot.data!.docs.length : 0;
                     if (count > 0) {
@@ -384,9 +362,11 @@ class _ProfileActionButton extends StatelessWidget {
                     return SizedBox();
                   },
                 ),
+              SizedBox(width: 8),
               Icon(
                 Icons.chevron_right,
                 color: Colors.grey[400],
+                size: 20,
               ),
             ],
           ),
@@ -394,4 +374,20 @@ class _ProfileActionButton extends StatelessWidget {
       ),
     );
   }
+}
+
+class _ProfileItem {
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+  final bool isDestructive;
+  final Stream<QuerySnapshot>? badgeStream;
+
+  _ProfileItem({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+    this.isDestructive = false,
+    this.badgeStream,
+  });
 }
