@@ -220,6 +220,8 @@ class _RequestsPageState extends State<RequestsPage> {
           String name = userData['username'] ?? 'Unknown';
           String email = userData['email'] ?? 'No Email';
           String profileImage = userData['profileImage'] ?? 'assets/images/profile_placeholder.png';
+          double rating = userData['rating']?.toDouble() ?? 0.0;
+          int ratingCount = userData['ratingCount'] ?? 0;
 
           showDialog(
             context: context,
@@ -239,6 +241,41 @@ class _RequestsPageState extends State<RequestsPage> {
                     Text(name, style: TextStyle(fontWeight: FontWeight.bold)),
                     SizedBox(height: 5),
                     Text(email, style: TextStyle(color: Colors.grey)),
+                    SizedBox(height: 10),
+                    if (ratingCount > 0)
+                      Column(
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.star, color: Colors.amber, size: 20),
+                              SizedBox(width: 4),
+                              Text(
+                                rating.toStringAsFixed(1),
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                ),
+                              ),
+                            ],
+                          ),
+                          Text(
+                            '(${ratingCount} ${ratingCount == 1 ? 'rating' : 'ratings'})',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey,
+                            ),
+                          ),
+                        ],
+                      )
+                    else
+                      Text(
+                        'No ratings yet',
+                        style: TextStyle(
+                          fontStyle: FontStyle.italic,
+                          color: Colors.grey,
+                        ),
+                      ),
                   ],
                 ),
                 actions: [
