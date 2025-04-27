@@ -162,56 +162,73 @@ class _MyRequestsPageState extends State<MyRequestsPage> {
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setState) {
-            return AlertDialog(
-              title: Text('Rate $userName'),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text('How would you rate their service?'),
-                  SizedBox(height: 20),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: List.generate(5, (index) {
-                      return IconButton(
-                        icon: Icon(
-                          index < rating ? Icons.star : Icons.star_border,
-                          color: Colors.amber,
-                          size: 30,
-                        ),
-                        onPressed: () {
-                          setState(() {
-                            rating = index + 1.0;
-                          });
-                        },
-                      );
-                    }),
+            return Dialog(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxWidth: MediaQuery.of(context).size.width * 0.8, // 80% of screen width
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'Rate $userName',
+                        style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                      ),
+                      SizedBox(height: 16),
+                      Text('How would you rate their service?'),
+                      SizedBox(height: 20),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: List.generate(5, (index) {
+                          return IconButton(
+                            padding: EdgeInsets.symmetric(horizontal: 4), // Reduced padding
+                            icon: Icon(
+                              index < rating ? Icons.star : Icons.star_border,
+                              color: Colors.amber,
+                              size: 30,
+                            ),
+                            onPressed: () {
+                              setState(() {
+                                rating = index + 1.0;
+                              });
+                            },
+                          );
+                        }),
+                      ),
+                      SizedBox(height: 10),
+                      Text('${rating.toInt()} stars', style: TextStyle(fontSize: 16)),
+                      SizedBox(height: 20),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(context),
+                            child: Text('Cancel'),
+                          ),
+                          SizedBox(width: 8),
+                          ElevatedButton(
+                            onPressed: rating > 0
+                                ? () async {
+                              await _submitRating(bookingId, userId, rating);
+                              Navigator.pop(context);
+                            }
+                                : null,
+                            child: Text('Submit'),
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
-                  SizedBox(height: 10),
-                  Text('${rating.toInt()} stars', style: TextStyle(fontSize: 16)),
-                ],
+                ),
               ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: Text('Cancel'),
-                ),
-                ElevatedButton(
-                  onPressed: rating > 0
-                      ? () async {
-                    await _submitRating(bookingId, userId, rating);
-                    Navigator.pop(context);
-                  }
-                      : null,
-                  child: Text('Submit'),
-                ),
-              ],
             );
           },
         );
       },
     );
   }
-
   Future<void> _submitRating(String bookingId, String userId, double rating) async {
     try {
       // First get current user rating data
