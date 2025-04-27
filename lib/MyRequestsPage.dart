@@ -53,12 +53,23 @@ class _MyRequestsPageState extends State<MyRequestsPage> {
 
         if (userDoc.exists) {
           var userData = userDoc.data() as Map<String, dynamic>;
+
+          // Get cached rating from booking if it exists, otherwise fetch from user profile
+          double rating = bookingData['cachedRating']?.toDouble() ??
+              userData['rating']?.toDouble() ?? 0.0;
+          int ratingCount = bookingData['cachedRatingCount'] ??
+              userData['ratingCount'] ?? 0;
+
           applicants.add({
             'name': '${userData['first_name']} ${userData['last_name']}',
             'email': userData['email'],
             'phone': userData['phone'],
             'bookingId': bookingDoc.id,
             'status': bookingData['status'] ?? 'Applied',
+            'userId': applicantId,
+            'rating': rating,
+            'ratingCount': ratingCount,
+            'hasRated': bookingData['hasRated'] ?? false,
           });
         }
       }
@@ -140,6 +151,102 @@ class _MyRequestsPageState extends State<MyRequestsPage> {
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Failed to delete request: $e')),
+      );
+    }
+  }
+
+  Future<void> _showRatingDialog(String bookingId, String userId, String userName) async {
+    double rating = 0;
+    await showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: Text('Rate $userName'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text('How would you rate their service?'),
+                  SizedBox(height: 20),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: List.generate(5, (index) {
+                      return IconButton(
+                        icon: Icon(
+                          index < rating ? Icons.star : Icons.star_border,
+                          color: Colors.amber,
+                          size: 30,
+                        ),
+                        onPressed: () {
+                          setState(() {
+                            rating = index + 1.0;
+                          });
+                        },
+                      );
+                    }),
+                  ),
+                  SizedBox(height: 10),
+                  Text('${rating.toInt()} stars', style: TextStyle(fontSize: 16)),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: rating > 0
+                      ? () async {
+                    await _submitRating(bookingId, userId, rating);
+                    Navigator.pop(context);
+                  }
+                      : null,
+                  child: Text('Submit'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Future<void> _submitRating(String bookingId, String userId, double rating) async {
+    try {
+      // First get current user rating data
+      DocumentSnapshot userDoc = await _firestore.collection('users').doc(userId).get();
+      Map<String, dynamic> userData = userDoc.data() as Map<String, dynamic>;
+
+      double currentRating = userData['rating']?.toDouble() ?? 0.0;
+      int ratingCount = userData['ratingCount'] ?? 0;
+
+      // Calculate new rating
+      double newRating = ((currentRating * ratingCount) + rating) / (ratingCount + 1);
+
+      // Update user's rating in their profile
+      await _firestore.collection('users').doc(userId).update({
+        'rating': newRating,
+        'ratingCount': ratingCount + 1,
+      });
+
+      // Cache the rating data in the booking document
+      await _firestore.collection('bookings').doc(bookingId).update({
+        'hasRated': true,
+        'cachedRating': newRating,
+        'cachedRatingCount': ratingCount + 1,
+      });
+
+      setState(() {
+        _futureRequests = getRequests();
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Rating submitted successfully!')),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to submit rating: $e')),
       );
     }
   }
@@ -299,11 +406,29 @@ class _MyRequestsPageState extends State<MyRequestsPage> {
                                                   Row(
                                                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                                     children: [
-                                                      Text(
-                                                        applicant['name'],
-                                                        style: TextStyle(
-                                                          fontWeight: FontWeight.bold,
-                                                          fontSize: 16,
+                                                      Expanded(
+                                                        child: Column(
+                                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                                          children: [
+                                                            Text(
+                                                              applicant['name'],
+                                                              style: TextStyle(
+                                                                fontWeight: FontWeight.bold,
+                                                                fontSize: 16,
+                                                              ),
+                                                            ),
+                                                            if (applicant['ratingCount'] > 0)
+                                                              Row(
+                                                                children: [
+                                                                  Icon(Icons.star, color: Colors.amber, size: 16),
+                                                                  SizedBox(width: 4),
+                                                                  Text(
+                                                                    '${applicant['rating'].toStringAsFixed(1)} (${applicant['ratingCount']} votes)',
+                                                                    style: TextStyle(fontSize: 12),
+                                                                  ),
+                                                                ],
+                                                              ),
+                                                          ],
                                                         ),
                                                       ),
                                                       Container(
@@ -346,7 +471,24 @@ class _MyRequestsPageState extends State<MyRequestsPage> {
                                                           style: ElevatedButton.styleFrom(
                                                             backgroundColor: Colors.green,
                                                           ),
-                                                          child: Text('Approve',style: TextStyle(color: Colors.white)),
+                                                          child: Text('Approve', style: TextStyle(color: Colors.white)),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  if (applicant['status'] == 'Approved' && !applicant['hasRated'])
+                                                    Row(
+                                                      mainAxisAlignment: MainAxisAlignment.end,
+                                                      children: [
+                                                        ElevatedButton(
+                                                          onPressed: () => _showRatingDialog(
+                                                            applicant['bookingId'],
+                                                            applicant['userId'],
+                                                            applicant['name'],
+                                                          ),
+                                                          style: ElevatedButton.styleFrom(
+                                                            backgroundColor: Colors.blue,
+                                                          ),
+                                                          child: Text('Rate My Service', style: TextStyle(color: Colors.white)),
                                                         ),
                                                       ],
                                                     ),
