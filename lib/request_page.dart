@@ -24,75 +24,95 @@ class _RequestsPageState extends State<RequestsPage> {
   String? _filterType;
   String? _filterValue;
 
+  // Color scheme
+  final Color primaryColor = Color(0xFF00897B); // Teal 600
+  final Color secondaryColor = Color(0xFFB2DFDB); // Teal 100
+  final Color accentColor = Color(0xFF4DB6AC); // Teal 300
+  final Color backgroundColor = Color(0xFFE0F2F1); // Teal 50
+
+  @override
+  void dispose() {
+    _petNameController.dispose();
+    _careDetailsController.dispose();
+    super.dispose();
+  }
+
   void _pickDate(BuildContext context) async {
-    DateTime? pickedDate = await showDatePicker(
+    final DateTime? pickedDate = await showDatePicker(
       context: context,
       initialDate: DateTime.now(),
       firstDate: DateTime.now(),
       lastDate: DateTime(2100),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: ColorScheme.light(
+              primary: primaryColor,
+              onPrimary: Colors.white,
+              onSurface: Colors.black,
+            ),
+          ),
+          child: child!,
+        );
+      },
     );
+
     if (pickedDate != null) {
-      setState(() {
-        _selectedDate = pickedDate;
-      });
+      setState(() => _selectedDate = pickedDate);
     }
   }
 
   void _submitRequest() async {
-    if (_formKey.currentState?.validate() ?? false) {
-      if (_selectedDate == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Please select a date')),
-        );
-        return;
-      }
+    if (!(_formKey.currentState?.validate() ?? false)) return;
+    if (_selectedDate == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Please select a date')),
+      );
+      return;
+    }
 
-      if (_isSubmitting) return;
+    if (_isSubmitting) return;
+    setState(() => _isSubmitting = true);
 
-      setState(() {
-        _isSubmitting = true;
-      });
+    try {
+      User? user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        DocumentSnapshot userDoc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .get();
 
-      try {
-        User? user = FirebaseAuth.instance.currentUser;
-        if (user != null) {
-          DocumentSnapshot userDoc = await FirebaseFirestore.instance
-              .collection('users')
-              .doc(user.uid)
-              .get();
+        String username = userDoc.exists ? (userDoc['username'] ?? 'Unknown') : 'Unknown';
 
-          String username = userDoc.exists
-              ? (userDoc['username'] ?? 'Unknown')
-              : 'Unknown';
+        await FirebaseFirestore.instance.collection('requests').add({
+          'userId': user.uid,
+          'requester': username,
+          'petName': _petNameController.text.trim(),
+          'petCategory': _selectedPetCategory,
+          'careDetails': _careDetailsController.text.trim(),
+          'location': _selectedLocation,
+          'reqDate': DateFormat('yyyy-MM-dd').format(_selectedDate!),
+          'timestamp': FieldValue.serverTimestamp(),
+        });
 
-          await FirebaseFirestore.instance.collection('requests').add({
-            'userId': user.uid,
-            'requester': username,
-            'petName': _petNameController.text.trim(),
-            'petCategory': _selectedPetCategory,
-            'careDetails': _careDetailsController.text.trim(),
-            'location': _selectedLocation,
-            'reqDate': DateFormat('yyyy-MM-dd').format(_selectedDate!),
-            'timestamp': FieldValue.serverTimestamp(),
-          });
-
-          setState(() {
-            _petNameController.clear();
-            _careDetailsController.clear();
-            _selectedPetCategory = 'Dog';
-            _selectedLocation = 'Dhanmondi';
-            _selectedDate = null;
-            _isSubmitting = false;
-          });
-
-          Navigator.of(context).pop();
-        }
-      } catch (e) {
-        print("Error saving request: $e");
+        // Clear form
+        _petNameController.clear();
+        _careDetailsController.clear();
         setState(() {
+          _selectedPetCategory = 'Dog';
+          _selectedLocation = 'Dhanmondi';
+          _selectedDate = null;
           _isSubmitting = false;
         });
+
+        Navigator.of(context).pop();
       }
+    } catch (e) {
+      print("Error saving request: $e");
+      setState(() => _isSubmitting = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to submit request')),
+      );
     }
   }
 
@@ -100,114 +120,183 @@ class _RequestsPageState extends State<RequestsPage> {
     showDialog(
       context: context,
       builder: (context) {
-        return AlertDialog(
-          title: Center(child: Text("Request Pet Care", style: TextStyle(fontWeight: FontWeight.bold))),
-          content: SingleChildScrollView(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8.0),
-              child: StatefulBuilder(
-                builder: (context, setStateSB) {
-                  return Form(
+        return Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          elevation: 0,
+          child: Container(
+            padding: EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    "Request Pet Care",
+                    style: TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                      color: primaryColor,
+                    ),
+                  ),
+                  SizedBox(height: 20),
+                  Form(
                     key: _formKey,
                     child: Column(
-                      mainAxisSize: MainAxisSize.min,
+                        children: [
+                        _buildTextField(_petNameController, 'Pet Name', 'Enter your pet\'s name'),
+                    SizedBox(height: 12),
+                    _buildDropdown(
+                      value: _selectedPetCategory,
+                      items: petTypes,
+                      label: 'Pet Category',
+                      onChanged: (value) => setState(() => _selectedPetCategory = value!),
+                    ),
+                    SizedBox(height: 12),
+                    _buildTextField(_careDetailsController, 'Care Details', 'Enter care details'),
+                    SizedBox(height: 12),
+                    _buildDatePicker(),
+                    SizedBox(height: 12),
+                    _buildDropdown(
+                      value: _selectedLocation,
+                      items: locations,
+                      label: 'Location',
+                      onChanged: (value) => setState(() => _selectedLocation = value!),
+                    ),
+                    SizedBox(height: 20),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
                       children: [
-                        _buildTextField(_petNameController, 'Pet Name', 'Enter your petsname'),
-                        DropdownButtonFormField<String>(
-                          decoration: InputDecoration(
-                            labelText: 'Pet Category',
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                          ),
-                          value: _selectedPetCategory,
-                          items: ['Dog', 'Cat', 'Bird', 'Others'].map((category) {
-                            return DropdownMenuItem<String>(
-                              value: category,
-                              child: Text(category),
-                            );
-                          }).toList(),
-                          onChanged: (value) {
-                            setStateSB(() {
-                              _selectedPetCategory = value!;
-                            });
-                          },
-                        ),
-                        SizedBox(height: 15),
-                        _buildTextField(_careDetailsController, 'Care Details', 'Enter care details'),
-                        InkWell(
-                          onTap: () async {
-                            DateTime? pickedDate = await showDatePicker(
-                              context: context,
-                              initialDate: DateTime.now(),
-                              firstDate: DateTime.now(),
-                              lastDate: DateTime(2100),
-                            );
-                            if (pickedDate != null) {
-                              setStateSB(() {
-                                _selectedDate = pickedDate;
-                              });
-                            }
-                          },
-                          child: InputDecorator(
-                            decoration: InputDecoration(
-                              labelText: 'Request Date',
-                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                        TextButton(
+                          onPressed: () => Navigator.pop(context),
+                          child: Text(
+                            'Cancel',
+                            style: TextStyle(color: Colors.grey[600]),
+                          ),),
+                          SizedBox(width: 8),
+                          ElevatedButton(
+                            onPressed: _isSubmitting ? null : _submitRequest,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: primaryColor,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                             ),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text(
-                                  _selectedDate != null
-                                      ? DateFormat('yyyy-MM-dd').format(_selectedDate!)
-                                      : 'Select a date',
-                                  style: TextStyle(fontSize: 16),
-                                ),
-                                Icon(Icons.calendar_today, color: Colors.teal),
-                              ],
+                            child: _isSubmitting
+                                ? SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                                : Text(
+                              'Submit',
+                              style: TextStyle(color: Colors.white),
                             ),
                           ),
+                        ],
                         ),
-                        SizedBox(height: 15),
-                        DropdownButtonFormField<String>(
-                          decoration: InputDecoration(
-                            labelText: 'Location',
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                          ),
-                          value: _selectedLocation,
-                          items: locations.map((location) {
-                            return DropdownMenuItem<String>(
-                              value: location,
-                              child: Text(location),
-                            );
-                          }).toList(),
-                          onChanged: (value) {
-                            setStateSB(() {
-                              _selectedLocation = value!;
-                            });
-                          },
-                        ),
-                        SizedBox(height: 20),
                       ],
                     ),
-                  );
-                },
+                  ),
+                ],
               ),
             ),
           ),
-          actions: [
-            ElevatedButton(
-              onPressed: _submitRequest,
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.teal),
-              child: Text('Submit', style: TextStyle(color: Colors.white)),
-            ),
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-              },
-              child: Text('Cancel'),
-            ),
-          ],
         );
       },
+    );
+  }
+
+  Widget _buildDropdown({
+    required String value,
+    required List<String> items,
+    required String label,
+    required Function(String?) onChanged,
+  }) {
+    return DropdownButtonFormField<String>(
+      value: value,
+      decoration: InputDecoration(
+        labelText: label,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: BorderSide(color: Colors.grey[300]!),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: BorderSide(color: Colors.grey[300]!),
+        ),
+        filled: true,
+        fillColor: Colors.grey[50],
+      ),
+      items: items.map((item) {
+        return DropdownMenuItem<String>(
+          value: item,
+          child: Text(item),
+        );
+      }).toList(),
+      onChanged: onChanged,
+    );
+  }
+
+  Widget _buildDatePicker() {
+    return InkWell(
+      onTap: () => _pickDate(context),
+      child: InputDecorator(
+        decoration: InputDecoration(
+          labelText: 'Request Date',
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(10),
+            borderSide: BorderSide(color: Colors.grey[300]!),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(10),
+            borderSide: BorderSide(color: Colors.grey[300]!),
+          ),
+          filled: true,
+          fillColor: Colors.grey[50],
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              _selectedDate != null
+                  ? DateFormat('yyyy-MM-dd').format(_selectedDate!)
+                  : 'Select a date',
+              style: TextStyle(fontSize: 16),
+            ),
+            Icon(Icons.calendar_today, color: primaryColor),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTextField(TextEditingController controller, String label, String hint) {
+    return TextFormField(
+      controller: controller,
+      decoration: InputDecoration(
+        labelText: label,
+        hintText: hint,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: BorderSide(color: Colors.grey[300]!),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: BorderSide(color: Colors.grey[300]!),
+        ),
+        filled: true,
+        fillColor: Colors.grey[50],
+      ),
+      validator: (value) => value!.isEmpty ? 'Please enter $label' : null,
     );
   }
 
@@ -226,64 +315,89 @@ class _RequestsPageState extends State<RequestsPage> {
           showDialog(
             context: context,
             builder: (context) {
-              return AlertDialog(
-                title: Text("Requester Profile"),
-                content: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    CircleAvatar(
-                      radius: 40,
-                      backgroundImage: profileImage.startsWith('http')
-                          ? NetworkImage(profileImage)
-                          : AssetImage(profileImage) as ImageProvider,
-                    ),
-                    SizedBox(height: 10),
-                    Text(name, style: TextStyle(fontWeight: FontWeight.bold)),
-                    SizedBox(height: 5),
-                    Text(email, style: TextStyle(color: Colors.grey)),
-                    SizedBox(height: 10),
-                    if (ratingCount > 0)
-                      Column(
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(Icons.star, color: Colors.amber, size: 20),
-                              SizedBox(width: 4),
-                              Text(
-                                rating.toStringAsFixed(1),
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 16,
-                                ),
-                              ),
-                            ],
-                          ),
-                          Text(
-                            '(${ratingCount} ${ratingCount == 1 ? 'rating' : 'ratings'})',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey,
-                            ),
-                          ),
-                        ],
-                      )
-                    else
+              return Dialog(
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Padding(
+                  padding: EdgeInsets.all(20),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      CircleAvatar(
+                        radius: 40,
+                        backgroundImage: profileImage.startsWith('http')
+                            ? NetworkImage(profileImage)
+                            : AssetImage(profileImage) as ImageProvider,
+                      ),
+                      SizedBox(height: 16),
                       Text(
-                        'No ratings yet',
+                        name,
                         style: TextStyle(
-                          fontStyle: FontStyle.italic,
-                          color: Colors.grey,
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
-                  ],
-                ),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(context),
-                    child: Text("Close"),
+                      SizedBox(height: 4),
+                      Text(
+                        email,
+                        style: TextStyle(
+                          color: Colors.grey[600],
+                          fontSize: 14,
+                        ),
+                      ),
+                      SizedBox(height: 16),
+                      if (ratingCount > 0)
+                        Column(
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.star, color: Colors.amber, size: 20),
+                                SizedBox(width: 4),
+                                Text(
+                                  rating.toStringAsFixed(1),
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 16,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            Text(
+                              '(${ratingCount} ${ratingCount == 1 ? 'rating' : 'ratings'})',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey,
+                              ),
+                            ),
+                          ],
+                        )
+                      else
+                        Text(
+                          'No ratings yet',
+                          style: TextStyle(
+                            fontStyle: FontStyle.italic,
+                            color: Colors.grey,
+                          ),
+                        ),
+                      SizedBox(height: 20),
+                      ElevatedButton(
+                        onPressed: () => Navigator.pop(context),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: primaryColor,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                        child: Text(
+                          'Close',
+                          style: TextStyle(color: Colors.white),
+                        ),
+                      ),
+                    ],
                   ),
-                ],
+                ),
               );
             },
           );
@@ -291,6 +405,9 @@ class _RequestsPageState extends State<RequestsPage> {
       }
     } catch (e) {
       print("Error fetching user profile: $e");
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to load profile')),
+      );
     }
   }
 
@@ -325,7 +442,7 @@ class _RequestsPageState extends State<RequestsPage> {
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
             child: Text('Yes'),
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.teal),
+            style: ElevatedButton.styleFrom(backgroundColor: primaryColor),
           ),
         ],
       ),
@@ -333,7 +450,6 @@ class _RequestsPageState extends State<RequestsPage> {
 
     if (confirm == true) {
       try {
-        // Get the request details first
         DocumentSnapshot requestDoc = await FirebaseFirestore.instance
             .collection('requests')
             .doc(requestId)
@@ -342,7 +458,6 @@ class _RequestsPageState extends State<RequestsPage> {
         if (requestDoc.exists) {
           Map<String, dynamic> requestData = requestDoc.data() as Map<String, dynamic>;
 
-          // Create a booking document
           await FirebaseFirestore.instance.collection('bookings').add({
             'userId': currentUser.uid,
             'requestId': requestId,
@@ -360,7 +475,6 @@ class _RequestsPageState extends State<RequestsPage> {
             SnackBar(content: Text('Booking applied successfully!')),
           );
 
-          // Refresh the UI
           setState(() {});
         }
       } catch (e) {
@@ -372,19 +486,6 @@ class _RequestsPageState extends State<RequestsPage> {
     }
   }
 
-  Stream<QuerySnapshot> getFilteredStream() {
-    CollectionReference ref = FirebaseFirestore.instance.collection('requests');
-    Query query = ref.orderBy('timestamp', descending: true);
-
-    if (_filterType == 'Pet Type' && _filterValue != null) {
-      query = query.where('petCategory', isEqualTo: _filterValue);
-    } else if (_filterType == 'Area' && _filterValue != null) {
-      query = query.where('location', isEqualTo: _filterValue);
-    }
-
-    return query.snapshots();
-  }
-
   void _showFilterDialog(String type, List<String> options) {
     String selectedValue = options.first;
 
@@ -392,7 +493,7 @@ class _RequestsPageState extends State<RequestsPage> {
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: Text('Select $type'),
+          title: Text('Filter by $type'),
           content: StatefulBuilder(
             builder: (context, setStateSB) {
               return DropdownButton<String>(
@@ -415,7 +516,13 @@ class _RequestsPageState extends State<RequestsPage> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: Text("Cancel"),
+              child: Text(
+                "Cancel",
+                style: TextStyle(
+                  color: Colors.red, // <-- text color set to white
+                ),
+              ),
+
             ),
             ElevatedButton(
               onPressed: () {
@@ -425,12 +532,122 @@ class _RequestsPageState extends State<RequestsPage> {
                 });
                 Navigator.pop(context);
               },
-              child: Text("Apply"),
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.teal),
+              child: Text(
+                "Apply",
+                style: TextStyle(
+                  color: Colors.white, // <-- text color set to white
+                ),
+              ),
+              style: ElevatedButton.styleFrom(backgroundColor: primaryColor),
             ),
           ],
         );
       },
+    );
+  }
+
+  Stream<QuerySnapshot> getFilteredStream() {
+    CollectionReference ref = FirebaseFirestore.instance.collection('requests');
+    Query query = ref.orderBy('timestamp', descending: true);
+
+    if (_filterType == 'Pet Type' && _filterValue != null) {
+      query = query.where('petCategory', isEqualTo: _filterValue);
+    } else if (_filterType == 'Area' && _filterValue != null) {
+      query = query.where('location', isEqualTo: _filterValue);
+    }
+
+    return query.snapshots();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: backgroundColor,
+      appBar: AppBar(
+        automaticallyImplyLeading: false,
+        backgroundColor: backgroundColor,
+        toolbarHeight: 45,
+
+        actions: [
+          IconButton(
+            icon: Icon(Icons.filter_alt, color: Colors.teal),
+            tooltip: 'Filter',
+            iconSize: 30,
+            onPressed: () {
+              showModalBottomSheet(
+                context: context,
+                builder: (context) {
+                  return Container(
+                    padding: EdgeInsets.all(16),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          'Filter Requests',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: primaryColor,
+                          ),
+                        ),
+                        SizedBox(height: 16),
+                        ListTile(
+                          leading: Icon(Icons.pets, color: primaryColor),
+                          title: Text('By Pet Type'),
+                          onTap: () {
+                            Navigator.pop(context);
+                            _showFilterDialog('Pet Type', petTypes);
+                          },
+                        ),
+                        ListTile(
+                          leading: Icon(Icons.location_on, color: primaryColor),
+                          title: Text('By Area'),
+                          onTap: () {
+                            Navigator.pop(context);
+                            _showFilterDialog('Area', locations);
+                          },
+                        ),
+                        if (_filterValue != null)
+                          Padding(
+                            padding: EdgeInsets.symmetric(vertical: 8),
+                            child: ElevatedButton(
+                              onPressed: () {
+                                setState(() {
+                                  _filterType = null;
+                                  _filterValue = null;
+                                });
+                                Navigator.pop(context);
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.red[400],
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                              ),
+                              child: Text(
+                                "Clear filter",
+                                style: TextStyle(
+                                  color: Colors.white, // <-- text color set to white
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  );
+                },
+              );
+            },
+          ),
+        ],
+      ),
+      body: _buildRequestList(),
+      floatingActionButton: FloatingActionButton(
+        onPressed: _showFormDialog,
+        child: Icon(Icons.add, size: 28,color: Colors.white,),
+        backgroundColor: primaryColor,
+        elevation: 4,
+      ),
     );
   }
 
@@ -439,16 +656,41 @@ class _RequestsPageState extends State<RequestsPage> {
       stream: getFilteredStream(),
       builder: (context, AsyncSnapshot<QuerySnapshot> snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return Center(child: CircularProgressIndicator());
+          return Center(child: CircularProgressIndicator(color: primaryColor));
         }
 
         if (snapshot.hasError) {
-          return Center(child: Text('Error: ${snapshot.error}'));
+          return Center(child: Text('Error loading requests'));
         }
 
         final requests = snapshot.data?.docs ?? [];
 
+        if (requests.isEmpty) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.pets, size: 64, color: Colors.grey[400]),
+                SizedBox(height: 16),
+                Text(
+                  'No requests found',
+                  style: TextStyle(fontSize: 18, color: Colors.grey[600]),
+                ),
+                if (_filterValue != null)
+                  TextButton(
+                    onPressed: () => setState(() {
+                      _filterType = null;
+                      _filterValue = null;
+                    }),
+                    child: Text('Clear filter'),
+                  ),
+              ],
+            ),
+          );
+        }
+
         return ListView.builder(
+          padding: EdgeInsets.all(8),
           itemCount: requests.length,
           itemBuilder: (context, index) {
             final request = requests[index];
@@ -461,109 +703,118 @@ class _RequestsPageState extends State<RequestsPage> {
             final userId = request['userId'];
 
             return Card(
-              margin: EdgeInsets.all(8),
-              elevation: 4,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(petName, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-                    GestureDetector(
-                      onTap: () => _showRequesterProfile(userId),
-                      child: Text(
-                        'Requester: $requester',
-                        style: TextStyle(fontStyle: FontStyle.italic, color: Colors.blue),
-                      ),
-                    ),
-                    Text('Category: $petCategory'),
-                    Text('Care Details: $careDetails'),
-                    Text('Request Date: $reqDate'),
-                    Text('Location: $location', style: TextStyle(color: Colors.teal)),
-                    SizedBox(height: 10),
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: FutureBuilder<bool>(
-                        future: checkIfBooked(request.id),
-                        builder: (context, snapshot) {
-                          bool isBooked = snapshot.data ?? false;
-                          return ElevatedButton(
-                            onPressed: isBooked ? null : () => _handleBookNow(request.id, userId),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: isBooked ? Colors.grey : Colors.teal,
+              margin: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+              elevation: 2,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(12),
+                onTap: () {},
+                child: Padding(
+                  padding: EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            petName,
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: primaryColor,
+                            ),
+                          ),
+                          Container(
+                            padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: secondaryColor,
+                              borderRadius: BorderRadius.circular(12),
                             ),
                             child: Text(
-                              isBooked ? 'Applied' : 'Book Now',
-                              style: TextStyle(color: Colors.white),
+                              petCategory,
+                              style: TextStyle(
+                                color: primaryColor,
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
-                          );
-                        },
+                          ),
+                        ],
                       ),
-                    ),
-                  ],
+                      SizedBox(height: 8),
+                      GestureDetector(
+                        onTap: () => _showRequesterProfile(userId),
+                        child: RichText(
+                          text: TextSpan(
+                            style: TextStyle(color: Colors.black87),
+                            children: [
+                              TextSpan(
+                                text: 'Requester: ',
+                                style: TextStyle(fontWeight: FontWeight.bold),
+                              ),
+                              TextSpan(
+                                text: requester,
+                                style: TextStyle(
+                                  color: Colors.blue,
+
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      SizedBox(height: 8),
+                      Text(
+                        careDetails,
+                        style: TextStyle(color: Colors.grey[700]),
+                      ),
+                      SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Icon(Icons.calendar_today, size: 16, color: Colors.grey),
+                          SizedBox(width: 4),
+                          Text(reqDate),
+                          SizedBox(width: 16),
+                          Icon(Icons.location_on, size: 16, color: Colors.grey),
+                          SizedBox(width: 4),
+                          Text(location),
+                        ],
+                      ),
+                      SizedBox(height: 12),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: FutureBuilder<bool>(
+                          future: checkIfBooked(request.id),
+                          builder: (context, snapshot) {
+                            bool isBooked = snapshot.data ?? false;
+                            return ElevatedButton(
+                              onPressed: isBooked ? null : () => _handleBookNow(request.id, userId),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: isBooked ? Colors.grey : primaryColor,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                padding: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                              ),
+                              child: Text(
+                                isBooked ? 'Already Applied' : 'Book Now',
+                                style: TextStyle(color: Colors.white),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             );
           },
         );
       },
-    );
-  }
-
-  Widget _buildTextField(TextEditingController controller, String label, String hint) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8.0),
-      child: TextFormField(
-        controller: controller,
-        decoration: InputDecoration(
-          labelText: label,
-          hintText: hint,
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-        ),
-        validator: (value) => value!.isEmpty ? 'Please enter $label' : null,
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        automaticallyImplyLeading: false,
-        actions: [
-          PopupMenuButton<String>(
-            icon: Icon(Icons.filter_list),
-            onSelected: (value) {
-              if (value == 'Pet Type') {
-                _showFilterDialog('Pet Type', petTypes);
-              } else if (value == 'Area') {
-                _showFilterDialog('Area', locations);
-              }
-            },
-            itemBuilder: (context) => [
-              PopupMenuItem(value: 'Pet Type', child: Text('Search by Pet Type')),
-              PopupMenuItem(value: 'Area', child: Text('Search by Area')),
-            ],
-          ),
-          IconButton(
-            icon: Icon(Icons.clear),
-            tooltip: 'Clear Filter',
-            onPressed: () {
-              setState(() {
-                _filterType = null;
-                _filterValue = null;
-              });
-            },
-          ),
-        ],
-      ),
-      body: _buildRequestList(),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _showFormDialog,
-        child: Icon(Icons.add),
-        backgroundColor: Colors.teal,
-      ),
     );
   }
 }
