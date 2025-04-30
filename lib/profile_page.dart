@@ -75,205 +75,205 @@ class ProfilePage extends StatelessWidget {
           final ratingCount = userData['ratingCount'] ?? 0;
 
           return SingleChildScrollView(
-              child: Column(
-                  children: [
-              // Header Section
-              Container(
-              padding: EdgeInsets.only(top: MediaQuery.of(context).padding.top + 16),
-          decoration: BoxDecoration(
-          gradient: LinearGradient(
-          colors: [Colors.teal[700]!, Colors.blue[600]!],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          ),
-          borderRadius: BorderRadius.only(
-          bottomLeft: Radius.circular(30),
-          bottomRight: Radius.circular(30),
-          ),
-          ),
-          child: Column(
-          children: [
-          Align(
-          alignment: Alignment.topLeft,
+            child: Column(
+              children: [
+                // Header Section
+                Container(
+                  padding: EdgeInsets.only(top: MediaQuery.of(context).padding.top + 16),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [Colors.teal[700]!, Colors.blue[600]!],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.only(
+                      bottomLeft: Radius.circular(30),
+                      bottomRight: Radius.circular(30),
+                    ),
+                  ),
+                  child: Column(
+                    children: [
+                      Align(
+                        alignment: Alignment.topLeft,
 
-          ),
-          SizedBox(height: 16),
-          Stack(
-          alignment: Alignment.bottomRight,
-          children: [
-          Container(
-          padding: EdgeInsets.all(6),
-          decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: Colors.white,
-          boxShadow: [
-          BoxShadow(
-          color: Colors.black26,
-          blurRadius: 10,
-          offset: Offset(0, 4),
-          ),
-          ],
-          ),
-          child: CircleAvatar(
-          radius: 60,
-          backgroundImage: profileImage.startsWith('http')
-          ? NetworkImage(profileImage) as ImageProvider
-              : AssetImage(profileImage),
-          ),
-          ),
-          if (ratingCount > 0)
-          Container(
-          padding: EdgeInsets.symmetric(
-          horizontal: 12, vertical: 6),
-          decoration: BoxDecoration(
-          color: Colors.amber[700],
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-          BoxShadow(
-          color: Colors.black12,
-          blurRadius: 6,
-          offset: Offset(0, 2),
-          ),
-          ]),
+                      ),
+                      SizedBox(height: 16),
+                      Stack(
+                        alignment: Alignment.bottomRight,
+                        children: [
+                          Container(
+                            padding: EdgeInsets.all(6),
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: Colors.white,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black26,
+                                  blurRadius: 10,
+                                  offset: Offset(0, 4),
+                                ),
+                              ],
+                            ),
+                            child: CircleAvatar(
+                              radius: 60,
+                              backgroundImage: profileImage.startsWith('http')
+                                  ? NetworkImage(profileImage) as ImageProvider
+                                  : AssetImage(profileImage),
+                            ),
+                          ),
+                          if (ratingCount > 0)
+                            Container(
+                              padding: EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 6),
+                              decoration: BoxDecoration(
+                                  color: Colors.amber[700],
+                                  borderRadius: BorderRadius.circular(20),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black12,
+                                      blurRadius: 6,
+                                      offset: Offset(0, 2),
+                                    ),
+                                  ]),
 
-          child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-          Icon(Icons.star,
-          size: 18, color: Colors.white),
-          SizedBox(width: 4),
-          Text(
-          '${rating.toStringAsFixed(1)} (${ratingCount})',
-          style: TextStyle(
-          color: Colors.white,
-          fontWeight: FontWeight.bold,
-          fontSize: 14,
-          ),
-          ),
-          ],
-          ),
-          ),
-          ],
-          ),
-          SizedBox(height: 20),
-          Text(
-          name,
-          style: TextStyle(
-          fontSize: 24,
-          fontWeight: FontWeight.bold,
-          color: Colors.white,
-          fontFamily: 'Montserrat',
-          ),
-          ),
-          SizedBox(height: 4),
-          Text(
-          email,
-          style: TextStyle(
-          fontSize: 16,
-          color: Colors.white.withOpacity(0.9),
-          ),
-          ),
-          SizedBox(height: 30),
-          ],
-          ),
-          ),
-          // Content Section
-          Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
-          child: Column(
-          children: [
-          // Activity Section
-          _buildSectionCard(
-          context,
-          title: 'Activity',
-          items: [
-          _ProfileItem(
-          icon: Icons.notifications_outlined,
-          label: 'Notifications',
-          badgeStream: _firestore
-              .collection('notifications')
-              .where('userId', isEqualTo: _auth.currentUser?.uid)
-              .where('read', isEqualTo: false)
-              .snapshots(),
-          onTap: () => Navigator.push(
-          context,
-          MaterialPageRoute(
-          builder: (context) => NotificationsPage()),
-          ),
-          ),
-          _ProfileItem(
-          icon: Icons.list_alt_outlined,
-          label: 'My Requests',
-          onTap: () => Navigator.push(
-          context,
-          MaterialPageRoute(
-          builder: (context) => MyRequestsPage()),
-          ),
-          ),
-          _ProfileItem(
-          icon: Icons.bookmark_outline,
-          label: 'My Bookings',
-          onTap: () => Navigator.push(
-          context,
-          MaterialPageRoute(
-          builder: (context) => MyBookingsPage()),
-          ),
-          ),
-          _ProfileItem(
-          icon: Icons.edit_outlined,
-          label: 'Edit Profile',
-          onTap: () {
-          Navigator.push(
-          context,
-          MaterialPageRoute(
-          builder: (context) => EditProfilePage()),
-          );
-          },
-          ),
-            _ProfileItem(
-              icon: Icons.reviews_outlined,  // New icon for reviews
-              label: 'My Reviews',
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => ReviewsPage()),
-              ),
-            ),
-          ],
-          ),
-          SizedBox(height: 20),
-          // Account Section
-            _buildSectionCard(
-              context,
-              title: 'Account',
-              items: [
-                _ProfileItem(  // Add this new item
-                  icon: Icons.help_outline,
-                  label: 'Help & Support',
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => HelpPage()),
-                    );
-                  },
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.star,
+                                      size: 18, color: Colors.white),
+                                  SizedBox(width: 4),
+                                  Text(
+                                    '${rating.toStringAsFixed(1)} (${ratingCount})',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                        ],
+                      ),
+                      SizedBox(height: 20),
+                      Text(
+                        name,
+                        style: TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                          fontFamily: 'Montserrat',
+                        ),
+                      ),
+                      SizedBox(height: 4),
+                      Text(
+                        email,
+                        style: TextStyle(
+                          fontSize: 16,
+                          color: Colors.white.withOpacity(0.9),
+                        ),
+                      ),
+                      SizedBox(height: 30),
+                    ],
+                  ),
                 ),
-                _ProfileItem(
-                  icon: Icons.logout,
-                  label: 'Sign Out',
-                  isDestructive: true,
-                  onTap: () async {
-                    await _auth.signOut();
-                    // Navigate to login screen
-                  },
+                // Content Section
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+                  child: Column(
+                    children: [
+                      // Activity Section
+                      _buildSectionCard(
+                        context,
+                        title: 'Activity',
+                        items: [
+                          _ProfileItem(
+                            icon: Icons.notifications_outlined,
+                            label: 'Notifications',
+                            badgeStream: _firestore
+                                .collection('notifications')
+                                .where('userId', isEqualTo: _auth.currentUser?.uid)
+                                .where('read', isEqualTo: false)
+                                .snapshots(),
+                            onTap: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                  builder: (context) => NotificationsPage()),
+                            ),
+                          ),
+                          _ProfileItem(
+                            icon: Icons.list_alt_outlined,
+                            label: 'My Requests',
+                            onTap: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                  builder: (context) => MyRequestsPage()),
+                            ),
+                          ),
+                          _ProfileItem(
+                            icon: Icons.bookmark_outline,
+                            label: 'My Bookings',
+                            onTap: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                  builder: (context) => MyBookingsPage()),
+                            ),
+                          ),
+                          _ProfileItem(
+                            icon: Icons.edit_outlined,
+                            label: 'Edit Profile',
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                    builder: (context) => EditProfilePage()),
+                              );
+                            },
+                          ),
+                          _ProfileItem(
+                            icon: Icons.reviews_outlined,  // New icon for reviews
+                            label: 'My Reviews',
+                            onTap: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (context) => ReviewsPage()),
+                            ),
+                          ),
+                        ],
+                      ),
+                      SizedBox(height: 20),
+                      // Account Section
+                      _buildSectionCard(
+                        context,
+                        title: 'Account',
+                        items: [
+                          _ProfileItem(  // Add this new item
+                            icon: Icons.help_outline,
+                            label: 'Help & Support',
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(builder: (context) => HelpPage()),
+                              );
+                            },
+                          ),
+                          _ProfileItem(
+                            icon: Icons.logout,
+                            label: 'Sign Out',
+                            isDestructive: true,
+                            onTap: () async {
+                              await _auth.signOut();
+                              // Navigate to login screen
+                            },
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
-          ],
-          ),
-          ),
-          ],
-          ),
           );
-          },
+        },
       ),
     );
   }

@@ -564,13 +564,56 @@ class _RequestsPageState extends State<RequestsPage> {
     return Scaffold(
       backgroundColor: backgroundColor,
       appBar: AppBar(
+        title: Text(
+          'Requests',
+          style: TextStyle(
+            fontSize: 24,
+            fontWeight: FontWeight.w600,
+            color: Colors.white,
+            letterSpacing: 0.8,
+          ),
+        ),
+        centerTitle: true,
         automaticallyImplyLeading: false,
-        backgroundColor: backgroundColor,
-        toolbarHeight: 45,
-
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        toolbarHeight: 72,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.only(
+            bottomLeft: Radius.circular(20),
+            bottomRight: Radius.circular(20),
+          ),
+        ),
+        flexibleSpace: ClipRRect(
+          borderRadius: BorderRadius.only(
+            bottomLeft: Radius.circular(20),
+            bottomRight: Radius.circular(20),
+          ),
+          child: Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Color(0xFF008080),  // Professional teal
+                  Color(0xFF006D6D),  // Darker teal
+                ],
+                stops: [0.0, 1.0],
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.15),
+                  blurRadius: 12,
+                  spreadRadius: 0.5,
+                  offset: Offset(0, 6),
+                ),
+              ],
+            ),
+          ),
+        ),
         actions: [
           IconButton(
-            icon: Icon(Icons.filter_alt, color: Colors.teal),
+            icon: Icon(Icons.filter_alt, color: Colors.white),
             tooltip: 'Filter',
             iconSize: 30,
             onPressed: () {
