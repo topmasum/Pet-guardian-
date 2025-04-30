@@ -231,25 +231,29 @@ class _MyRequestsPageState extends State<MyRequestsPage> {
   }
   Future<void> _submitRating(String bookingId, String userId, double rating) async {
     try {
-      // First get current user rating data
+      // Store the original rating first
+      await _firestore.collection('bookings').doc(bookingId).update({
+        'hasRated': true,
+        'originalRating': rating,  // Store the original rating
+        'ratingSeen': false,       // Mark as unseen
+      });
+
+      // Then update the user's aggregated rating
       DocumentSnapshot userDoc = await _firestore.collection('users').doc(userId).get();
       Map<String, dynamic> userData = userDoc.data() as Map<String, dynamic>;
 
       double currentRating = userData['rating']?.toDouble() ?? 0.0;
       int ratingCount = userData['ratingCount'] ?? 0;
 
-      // Calculate new rating
       double newRating = ((currentRating * ratingCount) + rating) / (ratingCount + 1);
 
-      // Update user's rating in their profile
       await _firestore.collection('users').doc(userId).update({
         'rating': newRating,
         'ratingCount': ratingCount + 1,
       });
 
-      // Cache the rating data in the booking document
+      // Update the cached values in the booking
       await _firestore.collection('bookings').doc(bookingId).update({
-        'hasRated': true,
         'cachedRating': newRating,
         'cachedRatingCount': ratingCount + 1,
       });
@@ -271,7 +275,17 @@ class _MyRequestsPageState extends State<MyRequestsPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('My Requests')),
+      appBar: AppBar(
+        title: Text(
+          'My Requests',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: Colors.white// Makes the text bold
+          ),
+        ),
+        backgroundColor: Colors.teal, // Sets the background color to teal
+        centerTitle: true, // Centers the title
+      ),
       body: FutureBuilder<List<DocumentSnapshot>>(
         future: _futureRequests,
         builder: (context, snapshot) {

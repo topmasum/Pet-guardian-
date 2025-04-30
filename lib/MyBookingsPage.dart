@@ -133,11 +133,13 @@ class _MyBookingsPageState extends State<MyBookingsPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('My Bookings', style: TextStyle(fontWeight: FontWeight.w600)),
+        title: const Text('My Bookings', style: TextStyle(fontWeight: FontWeight.w600),
+
+        ),
         centerTitle: true,
         elevation: 0,
         backgroundColor: Colors.transparent,
-        foregroundColor: Theme.of(context).colorScheme.onBackground,
+        foregroundColor: Theme.of(context).colorScheme.onSurface,
       ),
       body: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16),
