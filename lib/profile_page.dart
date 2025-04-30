@@ -6,6 +6,7 @@ import 'MyBookingsPage.dart';
 import 'NotificationsPage.dart';
 import 'EditProfilePage.dart';
 import 'help.dart';
+import 'ReviewsPage.dart';
 
 class ProfilePage extends StatelessWidget {
   final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -229,6 +230,14 @@ class ProfilePage extends StatelessWidget {
           );
           },
           ),
+            _ProfileItem(
+              icon: Icons.reviews_outlined,  // New icon for reviews
+              label: 'My Reviews',
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => ReviewsPage()),
+              ),
+            ),
           ],
           ),
           SizedBox(height: 20),
