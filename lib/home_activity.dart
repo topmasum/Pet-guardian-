@@ -11,9 +11,8 @@ class HomeActivity extends StatefulWidget {
 class _HomeActivityState extends State<HomeActivity> {
   int _selectedIndex = 0;
 
-  final List<String> _titles = ['Requests', 'Tips', 'Profile'];
   final List<Widget> _pages = [
-    RequestsPage(),  // Use the imported classes
+    RequestsPage(),  // Each page will manage its own app bar if needed
     TipsPage(),
     ProfilePage(),
   ];
@@ -27,19 +26,6 @@ class _HomeActivityState extends State<HomeActivity> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          _titles[_selectedIndex],
-          style: TextStyle(
-            fontFamily: 'OpenSans',
-            fontSize: 30,
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
-          ),
-        ),
-        centerTitle: true,
-        backgroundColor: Colors.teal,
-      ),
       body: _pages[_selectedIndex],
       bottomNavigationBar: BottomNavigationBar(
         items: [

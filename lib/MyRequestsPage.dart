@@ -2,6 +2,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import 'caregiver_profile_page.dart';
+
 class MyRequestsPage extends StatefulWidget {
   @override
   _MyRequestsPageState createState() => _MyRequestsPageState();
@@ -157,6 +159,8 @@ class _MyRequestsPageState extends State<MyRequestsPage> {
 
   Future<void> _showRatingDialog(String bookingId, String userId, String userName) async {
     double rating = 0;
+    TextEditingController commentController = TextEditingController();
+
     await showDialog(
       context: context,
       builder: (context) {
@@ -165,7 +169,7 @@ class _MyRequestsPageState extends State<MyRequestsPage> {
             return Dialog(
               child: ConstrainedBox(
                 constraints: BoxConstraints(
-                  maxWidth: MediaQuery.of(context).size.width * 0.8, // 80% of screen width
+                  maxWidth: MediaQuery.of(context).size.width * 0.8,
                 ),
                 child: Padding(
                   padding: const EdgeInsets.all(16.0),
@@ -183,7 +187,7 @@ class _MyRequestsPageState extends State<MyRequestsPage> {
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: List.generate(5, (index) {
                           return IconButton(
-                            padding: EdgeInsets.symmetric(horizontal: 4), // Reduced padding
+                            padding: EdgeInsets.symmetric(horizontal: 4),
                             icon: Icon(
                               index < rating ? Icons.star : Icons.star_border,
                               color: Colors.amber,
@@ -200,6 +204,15 @@ class _MyRequestsPageState extends State<MyRequestsPage> {
                       SizedBox(height: 10),
                       Text('${rating.toInt()} stars', style: TextStyle(fontSize: 16)),
                       SizedBox(height: 20),
+                      TextField(
+                        controller: commentController,
+                        decoration: InputDecoration(
+                          labelText: 'Leave a comment (optional)',
+                          border: OutlineInputBorder(),
+                        ),
+                        maxLines: 3,
+                      ),
+                      SizedBox(height: 20),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.end,
                         children: [
@@ -211,7 +224,12 @@ class _MyRequestsPageState extends State<MyRequestsPage> {
                           ElevatedButton(
                             onPressed: rating > 0
                                 ? () async {
-                              await _submitRating(bookingId, userId, rating);
+                              await _submitRating(
+                                bookingId,
+                                userId,
+                                rating,
+                                commentController.text.trim(),
+                              );
                               Navigator.pop(context);
                             }
                                 : null,
@@ -229,13 +247,15 @@ class _MyRequestsPageState extends State<MyRequestsPage> {
       },
     );
   }
-  Future<void> _submitRating(String bookingId, String userId, double rating) async {
+
+  Future<void> _submitRating(String bookingId, String userId, double rating, String comment) async {
     try {
       // Store the original rating first
       await _firestore.collection('bookings').doc(bookingId).update({
         'hasRated': true,
-        'originalRating': rating,  // Store the original rating
-        'ratingSeen': false,       // Mark as unseen
+        'originalRating': rating,
+        'originalComment': comment.isNotEmpty ? comment : null, // Store the comment
+        'ratingSeen': false,
       });
 
       // Then update the user's aggregated rating
@@ -247,6 +267,16 @@ class _MyRequestsPageState extends State<MyRequestsPage> {
 
       double newRating = ((currentRating * ratingCount) + rating) / (ratingCount + 1);
 
+      // Store the review in the user's reviews subcollection
+      await _firestore.collection('users').doc(userId).collection('reviews').add({
+        'rating': rating,
+        'comment': comment.isNotEmpty ? comment : null,
+        'timestamp': Timestamp.now(),
+        'bookingId': bookingId,
+        'ratedById': _auth.currentUser!.uid,
+      });
+
+      // Update the user's main rating data
       await _firestore.collection('users').doc(userId).update({
         'rating': newRating,
         'ratingCount': ratingCount + 1,
@@ -441,11 +471,23 @@ class _MyRequestsPageState extends State<MyRequestsPage> {
                                                         child: Column(
                                                           crossAxisAlignment: CrossAxisAlignment.start,
                                                           children: [
-                                                            Text(
-                                                              applicant['name'],
-                                                              style: TextStyle(
-                                                                fontWeight: FontWeight.bold,
-                                                                fontSize: 16,
+                                                            GestureDetector(
+                                                              onTap: () {
+                                                                Navigator.push(
+                                                                  context,
+                                                                  MaterialPageRoute(
+                                                                    builder: (context) => CaregiverProfilePage(userId: applicant['userId']),
+                                                                  ),
+                                                                );
+                                                              },
+                                                              child: Text(
+                                                                applicant['name'],
+                                                                style: TextStyle(
+                                                                  fontWeight: FontWeight.bold,
+                                                                  fontSize: 16,
+                                                                  color: Colors.blue, // Make it look clickable
+                                                                  //decoration: TextDecoration.underline,
+                                                                ),
                                                               ),
                                                             ),
                                                             if (applicant['ratingCount'] > 0)
