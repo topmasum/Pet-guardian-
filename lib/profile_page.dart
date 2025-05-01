@@ -28,6 +28,7 @@ class ProfilePage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.grey[50],
+
       body: FutureBuilder<Map<String, dynamic>?>(
         future: getUserData(),
         builder: (context, snapshot) {
@@ -78,6 +79,7 @@ class ProfilePage extends StatelessWidget {
             child: Column(
               children: [
                 // Header Section
+                // In your ProfilePage build method, replace the header section with this:
                 Container(
                   padding: EdgeInsets.only(top: MediaQuery.of(context).padding.top + 16),
                   decoration: BoxDecoration(
@@ -93,9 +95,18 @@ class ProfilePage extends StatelessWidget {
                   ),
                   child: Column(
                     children: [
-                      Align(
-                        alignment: Alignment.topLeft,
-
+                      // Added back button row here
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                        child: Row(
+                          children: [
+                            IconButton(
+                              icon: Icon(Icons.arrow_back, color: Colors.white),
+                              onPressed: () => Navigator.pop(context),
+                            ),
+                            Spacer(), // This pushes the back button to the left
+                          ],
+                        ),
                       ),
                       SizedBox(height: 16),
                       Stack(
@@ -135,7 +146,6 @@ class ProfilePage extends StatelessWidget {
                                       offset: Offset(0, 2),
                                     ),
                                   ]),
-
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [

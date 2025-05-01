@@ -7,8 +7,46 @@ class HelpPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Help & Support'),
+        title: const Text(
+          'Help & Support',
+          style: TextStyle(
+            fontSize: 24,
+            fontWeight: FontWeight.w600,
+            color: Colors.white,
+            letterSpacing: 0.8,
+          ),
+        ),
+        centerTitle: true,
         elevation: 0,
+        backgroundColor: Colors.transparent,
+        toolbarHeight: 70,
+        iconTheme: IconThemeData(color: Colors.white),
+        flexibleSpace: ClipRRect(
+          borderRadius: BorderRadius.only(
+            bottomLeft: Radius.circular(20),
+            bottomRight: Radius.circular(20),
+          ),
+          child: Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Color(0xFF008080),  // Lighter teal
+                  Color(0xFF006D6D),  // Darker teal
+                ],
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.15),
+                  blurRadius: 12,
+                  spreadRadius: 0.5,
+                  offset: Offset(0, 6),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
       body: ListView(
         padding: const EdgeInsets.all(16),

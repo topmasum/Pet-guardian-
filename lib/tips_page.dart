@@ -20,6 +20,10 @@ class TipsPage extends StatelessWidget {
         backgroundColor: Colors.transparent,
         elevation: 0,
         toolbarHeight: 70,
+        leading: IconButton(
+          icon: Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () => Navigator.pop(context),
+        ),
         flexibleSpace: ClipRRect(
           borderRadius: BorderRadius.only(
             bottomLeft: Radius.circular(20),

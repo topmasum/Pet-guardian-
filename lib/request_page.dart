@@ -578,6 +578,10 @@ class _RequestsPageState extends State<RequestsPage> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         toolbarHeight: 72,
+        leading: IconButton(
+          icon: Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () => Navigator.pop(context),
+        ),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.only(
             bottomLeft: Radius.circular(20),
