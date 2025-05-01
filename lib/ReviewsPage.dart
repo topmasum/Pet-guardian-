@@ -120,6 +120,7 @@ class _ReviewsPageState extends State<ReviewsPage> {
     final data = booking.data() as Map<String, dynamic>;
     final originalRatingRaw = data['originalRating'];
     final originalRating = (originalRatingRaw is num) ? originalRatingRaw.toDouble() : 0.0;
+    final originalComment = data['originalComment'] as String?; // Get the comment
     final timestamp = data['processedAt']?.toDate() ?? DateTime.now();
     final isNew = _unseenReviews.contains(booking.id);
 
@@ -215,6 +216,39 @@ class _ReviewsPageState extends State<ReviewsPage> {
                     ),
                     SizedBox(height: 16),
                     _buildOriginalRatingStars(originalRating),
+
+                    // Add the comment section here
+                    if (originalComment != null && originalComment.isNotEmpty) ...[
+                      SizedBox(height: 16),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Comment:',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                          SizedBox(height: 4),
+                          Container(
+                            width: double.infinity,
+                            padding: EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: Colors.grey[100],
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              originalComment,
+                              style: TextStyle(
+                                fontSize: 14,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+
                     SizedBox(height: 16),
                     Divider(height: 1, thickness: 0.5),
                     SizedBox(height: 16),
@@ -394,6 +428,7 @@ class _ReviewsPageState extends State<ReviewsPage> {
         await _firestore.collection('bookings').doc(bookingId).update({
           'hasRated': false,
           'originalRating': FieldValue.delete(),
+          'originalComment': FieldValue.delete(),
           'cachedRating': FieldValue.delete(),
           'cachedRatingCount': FieldValue.delete(),
         });
