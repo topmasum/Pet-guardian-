@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'chat_screen.dart';
 
 class RequestsPage extends StatefulWidget {
   @override
@@ -302,106 +303,89 @@ class _RequestsPageState extends State<RequestsPage> {
 
   void _showRequesterProfile(String userId) async {
     try {
-      DocumentSnapshot userDoc = await FirebaseFirestore.instance.collection('users').doc(userId).get();
-      if (userDoc.exists) {
-        Map<String, dynamic>? userData = userDoc.data() as Map<String, dynamic>?;
-        if (userData != null) {
-          String name = userData['username'] ?? 'Unknown';
-          String email = userData['email'] ?? 'No Email';
-          String profileImage = userData['profileImage'] ?? 'assets/images/profile_placeholder.png';
-          double rating = userData['rating']?.toDouble() ?? 0.0;
-          int ratingCount = userData['ratingCount'] ?? 0;
+      DocumentSnapshot userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(userId)
+          .get();
 
-          showDialog(
-            context: context,
-            builder: (context) {
-              return Dialog(
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Padding(
-                  padding: EdgeInsets.all(20),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      CircleAvatar(
-                        radius: 40,
-                        backgroundImage: profileImage.startsWith('http')
-                            ? NetworkImage(profileImage)
-                            : AssetImage(profileImage) as ImageProvider,
+      if (userDoc.exists) {
+        String name = userDoc['username'] ?? 'Unknown';
+        String email = userDoc['email'] ?? 'No Email';
+
+        showDialog(
+          context: context,
+          builder: (context) {
+            return Dialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Padding(
+                padding: EdgeInsets.all(20),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    CircleAvatar(
+                      radius: 40,
+                      child: Icon(Icons.person, size: 40),
+                      backgroundColor: Colors.grey[300],
+                    ),
+                    SizedBox(height: 16),
+                    Text(
+                      name,
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
                       ),
-                      SizedBox(height: 16),
-                      Text(
-                        name,
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                        ),
+                    ),
+                    SizedBox(height: 4),
+                    Text(
+                      email,
+                      style: TextStyle(
+                        color: Colors.grey[600],
+                        fontSize: 14,
                       ),
-                      SizedBox(height: 4),
-                      Text(
-                        email,
-                        style: TextStyle(
-                          color: Colors.grey[600],
-                          fontSize: 14,
-                        ),
-                      ),
-                      SizedBox(height: 16),
-                      if (ratingCount > 0)
-                        Column(
-                          children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(Icons.star, color: Colors.amber, size: 20),
-                                SizedBox(width: 4),
-                                Text(
-                                  rating.toStringAsFixed(1),
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 16,
-                                  ),
-                                ),
-                              ],
+                    ),
+                    SizedBox(height: 20),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      children: [
+                        ElevatedButton(
+                          onPressed: () => Navigator.pop(context),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.grey[300],
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
                             ),
-                            Text(
-                              '(${ratingCount} ${ratingCount == 1 ? 'rating' : 'ratings'})',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.grey,
-                              ),
-                            ),
-                          ],
-                        )
-                      else
-                        Text(
-                          'No ratings yet',
-                          style: TextStyle(
-                            fontStyle: FontStyle.italic,
-                            color: Colors.grey,
+                          ),
+                          child: Text(
+                            'Close',
+                            style: TextStyle(color: Colors.black),
                           ),
                         ),
-                      SizedBox(height: 20),
-                      ElevatedButton(
-                        onPressed: () => Navigator.pop(context),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: primaryColor,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
+                        ElevatedButton(
+                          onPressed: () {
+                            Navigator.pop(context);
+                            _startChat(userId, name);
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: primaryColor,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                          child: Text(
+                            'Chat',
+                            style: TextStyle(color: Colors.white),
                           ),
                         ),
-                        child: Text(
-                          'Close',
-                          style: TextStyle(color: Colors.white),
-                        ),
-                      ),
-                    ],
-                  ),
+                      ],
+                    ),
+                  ],
                 ),
-              );
-            },
-          );
-        }
+              ),
+            );
+          },
+        );
       }
     } catch (e) {
       print("Error fetching user profile: $e");
@@ -411,6 +395,17 @@ class _RequestsPageState extends State<RequestsPage> {
     }
   }
 
+  void _startChat(String userId, String username) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ChatScreen(
+          receiverId: userId,
+          receiverName: username,
+        ),
+      ),
+    );
+  }
   Future<bool> checkIfBooked(String requestId) async {
     User? user = FirebaseAuth.instance.currentUser;
     if (user == null) return false;
