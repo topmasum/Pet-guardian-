@@ -17,6 +17,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
   late TextEditingController _emailController;
   late TextEditingController _phoneController;
   late TextEditingController _profileImageController;
+  late TextEditingController _addressController;
 
   bool _isLoading = false;
   bool _emailEditable = false;
@@ -28,6 +29,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
     _emailController = TextEditingController();
     _phoneController = TextEditingController();
     _profileImageController = TextEditingController();
+    _addressController = TextEditingController();
     _loadUserData();
   }
 
@@ -47,6 +49,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
             _emailController.text = data['email'] ?? user.email ?? '';
             _phoneController.text = data['phone'] ?? '';
             _profileImageController.text = data['profileImage'] ?? '';
+            _addressController.text = data['address'] ?? '';
           });
         }
       }
@@ -75,10 +78,10 @@ class _EditProfilePageState extends State<EditProfilePage> {
           'username': _nameController.text.trim(),
           'phone': _phoneController.text.trim(),
           'profileImage': _profileImageController.text.trim(),
+          'address': _addressController.text.trim(),
           'updatedAt': FieldValue.serverTimestamp(),
         };
 
-        // Only update email if it was changed and is editable
         if (_emailEditable && _emailController.text.trim() != user.email) {
           await user.updateEmail(_emailController.text.trim());
           updateData['email'] = _emailController.text.trim();
@@ -93,7 +96,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
             backgroundColor: Colors.green,
           ),
         );
-        Navigator.pop(context, true); // Return true to indicate success
+        Navigator.pop(context, true);
       }
     } on FirebaseAuthException catch (e) {
       String errorMessage = "Failed to update profile";
@@ -128,6 +131,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
     _emailController.dispose();
     _phoneController.dispose();
     _profileImageController.dispose();
+    _addressController.dispose();
     super.dispose();
   }
 
@@ -135,21 +139,56 @@ class _EditProfilePageState extends State<EditProfilePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Edit Profile', style: TextStyle(fontWeight: FontWeight.bold,color: Colors.white)),
+        title: Text(
+          'Edit Profile',
+          style: TextStyle(
+            fontSize: 24,
+            fontWeight: FontWeight.w600,
+            color: Colors.white,
+            letterSpacing: 0.8,
+          ),
+        ),
         centerTitle: true,
-        backgroundColor: Colors.teal,
+        backgroundColor: Colors.transparent,
         elevation: 0,
+        toolbarHeight: 70,
         leading: IconButton(
-          icon: Icon(Icons.arrow_back),
+          icon: Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.pop(context),
         ),
         actions: [
           IconButton(
-            icon: Icon(Icons.save),
+            icon: Icon(Icons.save, color: Colors.white),
             onPressed: _saveChanges,
             tooltip: 'Save Changes',
           ),
         ],
+        flexibleSpace: ClipRRect(
+          borderRadius: BorderRadius.only(
+            bottomLeft: Radius.circular(20),
+            bottomRight: Radius.circular(20),
+          ),
+          child: Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Color(0xFF008080),
+                  Color(0xFF006D6D),
+                ],
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.15),
+                  blurRadius: 12,
+                  spreadRadius: 0.5,
+                  offset: Offset(0, 6),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
       body: _isLoading
           ? Center(child: CircularProgressIndicator())
@@ -167,6 +206,8 @@ class _EditProfilePageState extends State<EditProfilePage> {
               _buildEmailField(),
               SizedBox(height: 16),
               _buildPhoneField(),
+              SizedBox(height: 16),
+              _buildAddressField(),
               SizedBox(height: 32),
               _buildSaveButton(),
             ],
@@ -290,6 +331,26 @@ class _EditProfilePageState extends State<EditProfilePage> {
         }
         if (value.length < 10) {
           return 'Phone number should be at least 10 digits';
+        }
+        return null;
+      },
+    );
+  }
+
+  Widget _buildAddressField() {
+    return TextFormField(
+      controller: _addressController,
+      decoration: InputDecoration(
+        labelText: 'Address',
+        prefixIcon: Icon(Icons.home),
+        border: OutlineInputBorder(),
+        filled: true,
+        fillColor: Colors.grey[50],
+      ),
+      maxLines: 2,
+      validator: (value) {
+        if (value == null || value.isEmpty) {
+          return 'Please enter your address';
         }
         return null;
       },

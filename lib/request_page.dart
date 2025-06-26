@@ -1,8 +1,7 @@
-import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'chat_page.dart';
 
 class RequestsPage extends StatefulWidget {
   @override
@@ -148,62 +147,61 @@ class _RequestsPageState extends State<RequestsPage> {
                   Form(
                     key: _formKey,
                     child: Column(
-                      children: [
+                        children: [
                         _buildTextField(_petNameController, 'Pet Name', 'Enter your pet\'s name'),
-                        SizedBox(height: 12),
-                        _buildDropdown(
-                          value: _selectedPetCategory,
-                          items: petTypes,
-                          label: 'Pet Category',
-                          onChanged: (value) => setState(() => _selectedPetCategory = value!),
-                        ),
-                        SizedBox(height: 12),
-                        _buildTextField(_careDetailsController, 'Care Details', 'Enter care details'),
-                        SizedBox(height: 12),
-                        _buildDatePicker(),
-                        SizedBox(height: 12),
-                        _buildDropdown(
-                          value: _selectedLocation,
-                          items: locations,
-                          label: 'Location',
-                          onChanged: (value) => setState(() => _selectedLocation = value!),
-                        ),
-                        SizedBox(height: 20),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.end,
-                          children: [
-                            TextButton(
-                              onPressed: () => Navigator.pop(context),
-                              child: Text(
-                                'Cancel',
-                                style: TextStyle(color: Colors.grey[600]),
+                    SizedBox(height: 12),
+                    _buildDropdown(
+                      value: _selectedPetCategory,
+                      items: petTypes,
+                      label: 'Pet Category',
+                      onChanged: (value) => setState(() => _selectedPetCategory = value!),
+                    ),
+                    SizedBox(height: 12),
+                    _buildTextField(_careDetailsController, 'Care Details', 'Enter care details'),
+                    SizedBox(height: 12),
+                    _buildDatePicker(),
+                    SizedBox(height: 12),
+                    _buildDropdown(
+                      value: _selectedLocation,
+                      items: locations,
+                      label: 'Location',
+                      onChanged: (value) => setState(() => _selectedLocation = value!),
+                    ),
+                    SizedBox(height: 20),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(context),
+                          child: Text(
+                            'Cancel',
+                            style: TextStyle(color: Colors.grey[600]),
+                          ),),
+                          SizedBox(width: 8),
+                          ElevatedButton(
+                            onPressed: _isSubmitting ? null : _submitRequest,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: primaryColor,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
                               ),
+                              padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                             ),
-                            SizedBox(width: 8),
-                            ElevatedButton(
-                              onPressed: _isSubmitting ? null : _submitRequest,
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: primaryColor,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                            child: _isSubmitting
+                                ? SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
                               ),
-                              child: _isSubmitting
-                                  ? SizedBox(
-                                width: 20,
-                                height: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: Colors.white,
-                                ),
-                              )
-                                  : Text(
-                                'Submit',
-                                style: TextStyle(color: Colors.white),
-                              ),
+                            )
+                                : Text(
+                              'Submit',
+                              style: TextStyle(color: Colors.white),
                             ),
-                          ],
+                          ),
+                        ],
                         ),
                       ],
                     ),
@@ -384,39 +382,18 @@ class _RequestsPageState extends State<RequestsPage> {
                           ),
                         ),
                       SizedBox(height: 20),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                        children: [
-                          ElevatedButton(
-                            onPressed: () => Navigator.pop(context),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.grey,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                            ),
-                            child: Text(
-                              'Close',
-                              style: TextStyle(color: Colors.white),
-                            ),
+                      ElevatedButton(
+                        onPressed: () => Navigator.pop(context),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: primaryColor,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
                           ),
-                          ElevatedButton(
-                            onPressed: () {
-                              Navigator.pop(context);
-                              _startChat(userId, name);
-                            },
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: primaryColor,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                            ),
-                            child: Text(
-                              'Chat',
-                              style: TextStyle(color: Colors.white),
-                            ),
-                          ),
-                        ],
+                        ),
+                        child: Text(
+                          'Close',
+                          style: TextStyle(color: Colors.white),
+                        ),
                       ),
                     ],
                   ),
@@ -432,51 +409,6 @@ class _RequestsPageState extends State<RequestsPage> {
         SnackBar(content: Text('Failed to load profile')),
       );
     }
-  }
-
-  void _startChat(String otherUserId, String otherUserName) async {
-    User? currentUser = FirebaseAuth.instance.currentUser;
-    if (currentUser == null) return;
-
-    // Get or create chat room
-    String chatRoomId = _getChatRoomId(currentUser.uid, otherUserId);
-
-    // Check if chat room exists, if not create it
-    DocumentSnapshot chatRoomSnapshot = await FirebaseFirestore.instance
-        .collection('chatRooms')
-        .doc(chatRoomId)
-        .get();
-
-    if (!chatRoomSnapshot.exists) {
-      await FirebaseFirestore.instance
-          .collection('chatRooms')
-          .doc(chatRoomId)
-          .set({
-        'users': [currentUser.uid, otherUserId],
-        'lastMessage': '',
-        'lastMessageTime': FieldValue.serverTimestamp(),
-        'lastMessageSender': '',
-      });
-    }
-
-    // Navigate to chat page
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => ChatPage(
-          chatRoomId: chatRoomId,
-          otherUserId: otherUserId,
-          otherUserName: otherUserName,
-        ),
-      ),
-    );
-  }
-
-  String _getChatRoomId(String user1, String user2) {
-    // Ensure consistent chat room ID regardless of user order
-    return user1.compareTo(user2) < 0
-        ? '${user1}_$user2'
-        : '${user2}_$user1';
   }
 
   Future<bool> checkIfBooked(String requestId) async {
@@ -587,9 +519,10 @@ class _RequestsPageState extends State<RequestsPage> {
               child: Text(
                 "Cancel",
                 style: TextStyle(
-                  color: Colors.red,
+                  color: Colors.red, // <-- text color set to white
                 ),
               ),
+
             ),
             ElevatedButton(
               onPressed: () {
@@ -602,7 +535,7 @@ class _RequestsPageState extends State<RequestsPage> {
               child: Text(
                 "Apply",
                 style: TextStyle(
-                  color: Colors.white,
+                  color: Colors.white, // <-- text color set to white
                 ),
               ),
               style: ElevatedButton.styleFrom(backgroundColor: primaryColor),
@@ -631,12 +564,56 @@ class _RequestsPageState extends State<RequestsPage> {
     return Scaffold(
       backgroundColor: backgroundColor,
       appBar: AppBar(
+        title: Text(
+          'Requests',
+          style: TextStyle(
+            fontSize: 24,
+            fontWeight: FontWeight.w600,
+            color: Colors.white,
+            letterSpacing: 0.8,
+          ),
+        ),
+        centerTitle: true,
         automaticallyImplyLeading: false,
-        backgroundColor: backgroundColor,
-        toolbarHeight: 45,
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        toolbarHeight: 72,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.only(
+            bottomLeft: Radius.circular(20),
+            bottomRight: Radius.circular(20),
+          ),
+        ),
+        flexibleSpace: ClipRRect(
+          borderRadius: BorderRadius.only(
+            bottomLeft: Radius.circular(20),
+            bottomRight: Radius.circular(20),
+          ),
+          child: Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Color(0xFF008080),  // Professional teal
+                  Color(0xFF006D6D),  // Darker teal
+                ],
+                stops: [0.0, 1.0],
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.15),
+                  blurRadius: 12,
+                  spreadRadius: 0.5,
+                  offset: Offset(0, 6),
+                ),
+              ],
+            ),
+          ),
+        ),
         actions: [
           IconButton(
-            icon: Icon(Icons.filter_alt, color: Colors.teal),
+            icon: Icon(Icons.filter_alt, color: Colors.white),
             tooltip: 'Filter',
             iconSize: 30,
             onPressed: () {
@@ -693,7 +670,7 @@ class _RequestsPageState extends State<RequestsPage> {
                               child: Text(
                                 "Clear filter",
                                 style: TextStyle(
-                                  color: Colors.white,
+                                  color: Colors.white, // <-- text color set to white
                                 ),
                               ),
                             ),
@@ -710,7 +687,7 @@ class _RequestsPageState extends State<RequestsPage> {
       body: _buildRequestList(),
       floatingActionButton: FloatingActionButton(
         onPressed: _showFormDialog,
-        child: Icon(Icons.add, size: 28, color: Colors.white),
+        child: Icon(Icons.add, size: 28,color: Colors.white,),
         backgroundColor: primaryColor,
         elevation: 4,
       ),
@@ -825,6 +802,7 @@ class _RequestsPageState extends State<RequestsPage> {
                                 text: requester,
                                 style: TextStyle(
                                   color: Colors.blue,
+
                                 ),
                               ),
                             ],

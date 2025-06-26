@@ -13,11 +13,18 @@ class _MyBookingsPageState extends State<MyBookingsPage> {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   late Future<List<Booking>> _futureBookings;
   final _dateFormatter = DateFormat('MMM dd, yyyy - hh:mm a');
+  bool _isLoading = false;
 
   @override
   void initState() {
     super.initState();
-    _futureBookings = _fetchBookings();
+    _loadBookings();
+  }
+
+  void _loadBookings() {
+    setState(() {
+      _futureBookings = _fetchBookings();
+    });
   }
 
   Future<List<Booking>> _fetchBookings() async {
@@ -43,13 +50,6 @@ class _MyBookingsPageState extends State<MyBookingsPage> {
               .doc(booking['requesterId'])
               .get();
 
-          if (doc.metadata.hasPendingWrites) {
-            await _sendBookingNotification(
-              booking['requesterId'],
-              booking['petName'] ?? 'Unknown Pet',
-            );
-          }
-
           bookings.add(Booking(
             id: doc.id,
             petName: booking['petName'] ?? 'Unknown Pet',
@@ -58,6 +58,7 @@ class _MyBookingsPageState extends State<MyBookingsPage> {
             date: _formatDate(booking['reqDate']),
             location: booking['location'] ?? 'Location not specified',
             status: _parseBookingStatus(booking['status'] ?? 'Applied'),
+            bookingDate: booking['bookingDate'] as Timestamp?,
           ));
         } catch (e) {
           debugPrint("Error processing booking ${doc.id}: $e");
@@ -93,39 +94,50 @@ class _MyBookingsPageState extends State<MyBookingsPage> {
     }
   }
 
-  Future<void> _sendBookingNotification(String requesterId, String petName) async {
-    try {
-      final userDoc = await _firestore.collection('users').doc(_auth.currentUser!.uid).get();
-      final userName = userDoc['username'] ?? 'Someone';
-
-      await _firestore.collection('notifications').add({
-        'userId': requesterId,
-        'title': 'New Booking Application',
-        'message': '$userName has applied to care for $petName',
-        'type': 'booking',
-        'read': false,
-        'timestamp': Timestamp.now(),
-        'relatedId': '',
-      });
-    } catch (e) {
-      debugPrint('Error sending booking notification: $e');
-    }
+  Future<void> _cancelBooking(String bookingId) async {
+    await _performBookingAction(
+      action: () => _firestore.collection('bookings').doc(bookingId).delete(),
+      successMessage: 'Booking cancelled successfully',
+      errorMessage: 'Failed to cancel booking',
+    );
   }
 
-  Future<void> _cancelBooking(String bookingId) async {
+  Future<void> _deleteBooking(String bookingId) async {
+    await _performBookingAction(
+      action: () => _firestore.collection('bookings').doc(bookingId).delete(),
+      successMessage: 'Booking deleted successfully',
+      errorMessage: 'Failed to delete booking',
+    );
+  }
+
+  Future<void> _performBookingAction({
+    required Future Function() action,
+    required String successMessage,
+    required String errorMessage,
+  }) async {
+    setState(() => _isLoading = true);
+
     try {
-      await _firestore.collection('bookings').doc(bookingId).delete();
-      setState(() {
-        _futureBookings = _fetchBookings();
-      });
+      await action();
+      _loadBookings();
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Booking cancelled successfully')),
+        SnackBar(
+          content: Text(successMessage),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: Colors.green,
+        ),
       );
     } catch (e) {
+      debugPrint('Error: $e');
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Failed to cancel booking')),
+        SnackBar(
+          content: Text(errorMessage),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: Colors.red,
+        ),
       );
-      debugPrint('Error cancelling booking: $e');
+    } finally {
+      setState(() => _isLoading = false);
     }
   }
 
@@ -133,21 +145,31 @@ class _MyBookingsPageState extends State<MyBookingsPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('My Bookings', style: TextStyle(fontWeight: FontWeight.w600),
-
+        title: const Text(
+          'My Bookings',
+          style: TextStyle(
+            fontSize: 24,
+            fontWeight: FontWeight.w600,
+            color: Colors.white,
+            letterSpacing: 0.8,
+          ),
         ),
         centerTitle: true,
         elevation: 0,
         backgroundColor: Colors.transparent,
-        foregroundColor: Theme.of(context).colorScheme.onSurface,
+        toolbarHeight: 70,
+        iconTheme: IconThemeData(color: Colors.white),
+        flexibleSpace: _buildAppBarGradient(),
       ),
-      body: Padding(
+      body: _isLoading
+          ? _buildLoadingIndicator()
+          : Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16),
         child: FutureBuilder<List<Booking>>(
           future: _futureBookings,
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator());
+              return _buildLoadingIndicator();
             }
 
             if (snapshot.hasError) {
@@ -161,6 +183,43 @@ class _MyBookingsPageState extends State<MyBookingsPage> {
             return _buildBookingsList(snapshot.data!);
           },
         ),
+      ),
+    );
+  }
+
+  Widget _buildAppBarGradient() {
+    return ClipRRect(
+      borderRadius: const BorderRadius.only(
+        bottomLeft: Radius.circular(20),
+        bottomRight: Radius.circular(20),
+      ),
+      child: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Color(0xFF008080),
+              Color(0xFF006D6D),
+            ],
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.15),
+              blurRadius: 12,
+              spreadRadius: 0.5,
+              offset: Offset(0, 6),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLoadingIndicator() {
+    return Center(
+      child: CircularProgressIndicator(
+        valueColor: AlwaysStoppedAnimation<Color>(Colors.teal),
       ),
     );
   }
@@ -184,13 +243,14 @@ class _MyBookingsPageState extends State<MyBookingsPage> {
           ),
           const SizedBox(height: 16),
           ElevatedButton(
-            onPressed: () => setState(() => _futureBookings = _fetchBookings()),
+            onPressed: _loadBookings,
             style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.teal,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),
               ),
             ),
-            child: const Text('Retry'),
+            child: const Text('Retry', style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
@@ -220,7 +280,7 @@ class _MyBookingsPageState extends State<MyBookingsPage> {
 
   Widget _buildBookingsList(List<Booking> bookings) {
     return RefreshIndicator(
-      onRefresh: () async => setState(() => _futureBookings = _fetchBookings()),
+      onRefresh: () async => _loadBookings(),
       child: ListView.separated(
         physics: const AlwaysScrollableScrollPhysics(),
         itemCount: bookings.length,
@@ -232,65 +292,118 @@ class _MyBookingsPageState extends State<MyBookingsPage> {
 
   Widget _buildBookingCard(Booking booking) {
     return Card(
-      elevation: 0,
+      elevation: 2,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: Colors.grey[200]!),
       ),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(12),
-        onTap: () {}, // Add booking details navigation if needed
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Flexible(
-                    child: Text(
-                      booking.petName,
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w600,
-                      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Flexible(
+                  child: Text(
+                    booking.petName,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
                     ),
-                  ),
-                  _buildStatusChip(booking.status),
-                ],
-              ),
-              const SizedBox(height: 12),
-              const Divider(height: 1),
-              const SizedBox(height: 12),
-              _buildDetailRow(Icons.person_outline, 'Requester:', booking.requesterName),
-              _buildDetailRow(Icons.pets, 'Pet Type:', booking.petCategory),
-              _buildDetailRow(Icons.calendar_today, 'Date:', booking.date),
-              _buildDetailRow(Icons.location_on_outlined, 'Location:', booking.location),
-              if (booking.status == BookingStatus.applied)
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: TextButton(
-                    style: TextButton.styleFrom(
-                      foregroundColor: Colors.red[400],
-                    ),
-                    onPressed: () => _showCancelDialog(booking.id),
-                    child: const Text('Cancel Application'),
                   ),
                 ),
-            ],
-          ),
+                _buildStatusChip(booking.status),
+              ],
+            ),
+            const SizedBox(height: 12),
+            const Divider(height: 1),
+            const SizedBox(height: 12),
+            _buildDetailRow(Icons.person_outline, 'Requester:', booking.requesterName),
+            _buildDetailRow(Icons.pets, 'Pet Type:', booking.petCategory),
+            _buildDetailRow(Icons.calendar_today, 'Date:', booking.date),
+            _buildDetailRow(Icons.location_on_outlined, 'Location:', booking.location),
+            const SizedBox(height: 8),
+            _buildActionButton(booking),
+          ],
         ),
       ),
     );
   }
 
+  Widget _buildActionButton(Booking booking) {
+    if (booking.status == BookingStatus.applied) {
+      return _buildTextButton(
+        text: 'Cancel Application',
+        onPressed: () => _showConfirmationDialog(
+          title: 'Cancel Booking?',
+          content: 'This action cannot be undone. Are you sure?',
+          action: () => _cancelBooking(booking.id),
+        ),
+      );
+    } else {
+      return _buildTextButton(
+        text: 'Delete Booking',
+        onPressed: () => _showConfirmationDialog(
+          title: 'Delete Booking?',
+          content: 'This will permanently remove this booking from your history.',
+          action: () => _deleteBooking(booking.id),
+        ),
+      );
+    }
+  }
+
+  Widget _buildTextButton({required String text, required VoidCallback onPressed}) {
+    return Align(
+      alignment: Alignment.centerRight,
+      child: TextButton(
+        style: TextButton.styleFrom(
+          foregroundColor: Colors.red[400],
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+        ),
+        onPressed: onPressed,
+        child: Text(text),
+      ),
+    );
+  }
+
+  void _showConfirmationDialog({
+    required String title,
+    required String content,
+    required VoidCallback action,
+  }) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(title),
+        content: Text(content),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Go Back'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              action();
+            },
+            style: TextButton.styleFrom(
+              foregroundColor: Colors.red,
+            ),
+            child: const Text('Confirm'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildStatusChip(BookingStatus status) {
-    final color = status == BookingStatus.approved
-        ? Colors.green
-        : status == BookingStatus.applied
-        ? Colors.orange
-        : Colors.red;
+    final (color, text) = switch (status) {
+      BookingStatus.approved => (Colors.green, 'Approved'),
+      BookingStatus.applied => (Colors.orange, 'Applied'),
+      BookingStatus.rejected => (Colors.red, 'Rejected'),
+      BookingStatus.completed => (Colors.teal, 'Completed'),
+    };
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -300,7 +413,7 @@ class _MyBookingsPageState extends State<MyBookingsPage> {
         border: Border.all(color: color.withOpacity(0.3)),
       ),
       child: Text(
-        status.toString().split('.').last,
+        text,
         style: TextStyle(
           color: color,
           fontWeight: FontWeight.w600,
@@ -339,32 +452,6 @@ class _MyBookingsPageState extends State<MyBookingsPage> {
       ),
     );
   }
-
-  void _showCancelDialog(String bookingId) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Cancel Booking?'),
-        content: const Text('This action cannot be undone. Are you sure you want to cancel this booking application?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Go Back'),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              _cancelBooking(bookingId);
-            },
-            style: TextButton.styleFrom(
-              foregroundColor: Colors.red,
-            ),
-            child: const Text('Cancel Booking'),
-          ),
-        ],
-      ),
-    );
-  }
 }
 
 enum BookingStatus { applied, approved, rejected, completed }
@@ -377,6 +464,7 @@ class Booking {
   final String date;
   final String location;
   final BookingStatus status;
+  final Timestamp? bookingDate;
 
   Booking({
     required this.id,
@@ -386,5 +474,6 @@ class Booking {
     required this.date,
     required this.location,
     required this.status,
+    this.bookingDate,
   });
 }
