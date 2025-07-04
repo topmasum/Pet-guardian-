@@ -59,49 +59,203 @@ class TipsPage extends StatelessWidget {
             colors: [Colors.teal[50]!, Colors.white],
           ),
         ),
-        child: Padding(
-          padding: EdgeInsets.all(16.0),
-          child: GridView.count(
-            crossAxisCount: 2,
-            childAspectRatio: 0.85,
-            padding: EdgeInsets.all(8.0),
-            crossAxisSpacing: 16,
-            mainAxisSpacing: 16,
-            children: [
-              _buildCategoryCard(
-                context,
-                "Cats",
-                "assets/images/cat.png",
-                Colors.orange[200]!,
-                CatTipsPage(),
+        child: Column(
+          children: [
+            Expanded(
+              child: Padding(
+                padding: EdgeInsets.all(16.0),
+                child: GridView.count(
+                  crossAxisCount: 2,
+                  childAspectRatio: 0.85,
+                  padding: EdgeInsets.all(8.0),
+                  crossAxisSpacing: 16,
+                  mainAxisSpacing: 16,
+                  children: [
+                    _buildCategoryCard(
+                      context,
+                      "Cats",
+                      "assets/images/cat.png",
+                      Colors.orange[200]!,
+                      CatTipsPage(),
+                    ),
+                    _buildCategoryCard(
+                      context,
+                      "Birds",
+                      "assets/images/bird.png",
+                      Colors.lightBlue[200]!,
+                      BirdTipsPage(),
+                    ),
+                    _buildCategoryCard(
+                      context,
+                      "Dogs",
+                      "assets/images/dog.png",
+                      Colors.brown[200]!,
+                      DogTipsPage(),
+                    ),
+                    _buildCategoryCard(
+                      context,
+                      "Others",
+                      "assets/images/others.png",
+                      Colors.green[200]!,
+                      OtherTipsPage(),
+                    ),
+                  ],
+                ),
               ),
-              _buildCategoryCard(
-                context,
-                "Birds",
-                "assets/images/bird.png",
-                Colors.lightBlue[200]!,
-                BirdTipsPage(),
-              ),
-              _buildCategoryCard(
-                context,
-                "Dogs",
-                "assets/images/dog.png",
-                Colors.brown[200]!,
-                DogTipsPage(),
-              ),
-              _buildCategoryCard(
-                context,
-                "Others",
-                "assets/images/others.png",
-                Colors.green[200]!,
-                OtherTipsPage(),
-              ),
-            ],
-          ),
+            ),
+            _buildHelplineSection(context),
+          ],
         ),
       ),
     );
   }
+
+  Widget _buildHelplineSection(BuildContext context) {
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.teal[800]!.withOpacity(0.1),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: EdgeInsets.only(bottom: 8),
+            child: Text(
+              'Emergency Contacts',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Colors.teal[900],
+              ),
+            ),
+          ),
+          Row(
+            children: [
+              Expanded(
+                child: _buildHelplineCard(
+                  "Pet Poison Helpline",
+                  "(855) 764-7661",
+                  Icons.warning_amber,
+                  Colors.red[400]!,
+                ),
+              ),
+              SizedBox(width: 10),
+              Expanded(
+                child: _buildHelplineCard(
+                  "Vet Emergency",
+                  "(888) 426-4435",
+                  Icons.local_hospital,
+                  Colors.green[400]!,
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: 10),
+          _buildEmergencyButton(context),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHelplineCard(String title, String number, IconData icon, Color color) {
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Container(
+        padding: EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            CircleAvatar(
+              backgroundColor: color.withOpacity(0.2),
+              child: Icon(icon, color: color, size: 20),
+            ),
+            SizedBox(height: 8),
+            Text(
+              title,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: Colors.teal[900],
+              ),
+            ),
+            SizedBox(height: 4),
+            Text(
+              number,
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.teal[700],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmergencyButton(BuildContext context) {
+    return SizedBox(
+      width: double.infinity,
+      child: ElevatedButton.icon(
+        icon: Icon(Icons.emergency, color: Colors.white),
+        label: Text('Emergency Vet Assistance'),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.red[400],
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          padding: EdgeInsets.symmetric(vertical: 14),
+        ),
+        onPressed: () {
+          showDialog(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: Text('Emergency Contacts'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildEmergencyContactItem(
+                    "Animal Poison Control",
+                    "(888) 426-4435",
+                  ),
+                  Divider(),
+                  _buildEmergencyContactItem(
+                    "Pet Emergency Hotline",
+                    "(855) 764-7661",
+                  ),
+                  Divider(),
+                  _buildEmergencyContactItem(
+                    "24/7 Vet Consultation",
+                    "(800) 738-7237",
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  child: Text('Close'),
+                  onPressed: () => Navigator.pop(context),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildEmergencyContactItem(String title, String number) {
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      title: Text(title, style: TextStyle(fontWeight: FontWeight.bold)),
+      subtitle: Text(number),
+    );
+  }
+
   Widget _buildCategoryCard(BuildContext context, String title, String imagePath, Color accentColor, Widget page) {
     return AnimatedPetCard(
       accentColor: accentColor,
@@ -121,7 +275,8 @@ class TipsPage extends StatelessWidget {
                     fit: BoxFit.contain,
                   ),
                 )),
-          ),Padding(
+          ),
+          Padding(
             padding: EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
             child: Text(
               title,
