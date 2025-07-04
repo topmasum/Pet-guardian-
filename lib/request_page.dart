@@ -40,7 +40,7 @@ class _RequestsPageState extends State<RequestsPage> {
   void _pickDate(BuildContext context) async {
     final DateTime? pickedDate = await showDatePicker(
       context: context,
-      initialDate: DateTime.now(),
+      initialDate: DateTime.now().add(Duration(days: 1)),
       firstDate: DateTime.now(),
       lastDate: DateTime(2100),
       builder: (context, child) {
@@ -66,7 +66,15 @@ class _RequestsPageState extends State<RequestsPage> {
     if (!(_formKey.currentState?.validate() ?? false)) return;
     if (_selectedDate == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Please select a date')),
+        SnackBar(content: Text('Please select a service date')),
+      );
+      return;
+    }
+
+    // Check if selected date is in the past
+    if (_selectedDate!.isBefore(DateTime.now())) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Service date cannot be in the past')),
       );
       return;
     }
@@ -91,7 +99,8 @@ class _RequestsPageState extends State<RequestsPage> {
           'petCategory': _selectedPetCategory,
           'careDetails': _careDetailsController.text.trim(),
           'location': _selectedLocation,
-          'reqDate': DateFormat('yyyy-MM-dd').format(_selectedDate!),
+          'serviceDate': _selectedDate, // Store as DateTime
+          'reqDate': FieldValue.serverTimestamp(), // Auto-filled creation date
           'timestamp': FieldValue.serverTimestamp(),
         });
 
@@ -147,61 +156,62 @@ class _RequestsPageState extends State<RequestsPage> {
                   Form(
                     key: _formKey,
                     child: Column(
-                        children: [
-                        _buildTextField(_petNameController, 'Pet Name', 'Enter your pet\'s name'),
-                    SizedBox(height: 12),
-                    _buildDropdown(
-                      value: _selectedPetCategory,
-                      items: petTypes,
-                      label: 'Pet Category',
-                      onChanged: (value) => setState(() => _selectedPetCategory = value!),
-                    ),
-                    SizedBox(height: 12),
-                    _buildTextField(_careDetailsController, 'Care Details', 'Enter care details'),
-                    SizedBox(height: 12),
-                    _buildDatePicker(),
-                    SizedBox(height: 12),
-                    _buildDropdown(
-                      value: _selectedLocation,
-                      items: locations,
-                      label: 'Location',
-                      onChanged: (value) => setState(() => _selectedLocation = value!),
-                    ),
-                    SizedBox(height: 20),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
                       children: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(context),
-                          child: Text(
-                            'Cancel',
-                            style: TextStyle(color: Colors.grey[600]),
-                          ),),
-                          SizedBox(width: 8),
-                          ElevatedButton(
-                            onPressed: _isSubmitting ? null : _submitRequest,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: primaryColor,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
+                        _buildTextField(_petNameController, 'Pet Name', 'Enter your pet\'s name'),
+                        SizedBox(height: 12),
+                        _buildDropdown(
+                          value: _selectedPetCategory,
+                          items: petTypes,
+                          label: 'Pet Category',
+                          onChanged: (value) => setState(() => _selectedPetCategory = value!),
+                        ),
+                        SizedBox(height: 12),
+                        _buildTextField(_careDetailsController, 'Care Details', 'Enter care details'),
+                        SizedBox(height: 12),
+                        _buildDatePicker(),
+                        SizedBox(height: 12),
+                        _buildDropdown(
+                          value: _selectedLocation,
+                          items: locations,
+                          label: 'Location',
+                          onChanged: (value) => setState(() => _selectedLocation = value!),
+                        ),
+                        SizedBox(height: 20),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(context),
+                              child: Text(
+                                'Cancel',
+                                style: TextStyle(color: Colors.grey[600]),
                               ),
-                              padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                             ),
-                            child: _isSubmitting
-                                ? SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Colors.white,
+                            SizedBox(width: 8),
+                            ElevatedButton(
+                              onPressed: _isSubmitting ? null : _submitRequest,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: primaryColor,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                               ),
-                            )
-                                : Text(
-                              'Submit',
-                              style: TextStyle(color: Colors.white),
+                              child: _isSubmitting
+                                  ? SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                                  : Text(
+                                'Submit',
+                                style: TextStyle(color: Colors.white),
+                              ),
                             ),
-                          ),
-                        ],
+                          ],
                         ),
                       ],
                     ),
@@ -251,7 +261,7 @@ class _RequestsPageState extends State<RequestsPage> {
       onTap: () => _pickDate(context),
       child: InputDecorator(
         decoration: InputDecoration(
-          labelText: 'Request Date',
+          labelText: 'Service Needed Date',
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(10),
             borderSide: BorderSide(color: Colors.grey[300]!),
@@ -262,14 +272,15 @@ class _RequestsPageState extends State<RequestsPage> {
           ),
           filled: true,
           fillColor: Colors.grey[50],
+          hintText: 'When do you need the service?',
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text(
               _selectedDate != null
-                  ? DateFormat('yyyy-MM-dd').format(_selectedDate!)
-                  : 'Select a date',
+                  ? DateFormat('MMM dd, yyyy').format(_selectedDate!)
+                  : 'Select service date',
               style: TextStyle(fontSize: 16),
             ),
             Icon(Icons.calendar_today, color: primaryColor),
@@ -466,7 +477,7 @@ class _RequestsPageState extends State<RequestsPage> {
             'petCategory': requestData['petCategory'],
             'careDetails': requestData['careDetails'],
             'location': requestData['location'],
-            'reqDate': requestData['reqDate'],
+            'serviceDate': requestData['serviceDate'],
             'bookingDate': FieldValue.serverTimestamp(),
             'status': 'Applied',
           });
@@ -519,10 +530,9 @@ class _RequestsPageState extends State<RequestsPage> {
               child: Text(
                 "Cancel",
                 style: TextStyle(
-                  color: Colors.red, // <-- text color set to white
+                  color: Colors.red,
                 ),
               ),
-
             ),
             ElevatedButton(
               onPressed: () {
@@ -535,7 +545,7 @@ class _RequestsPageState extends State<RequestsPage> {
               child: Text(
                 "Apply",
                 style: TextStyle(
-                  color: Colors.white, // <-- text color set to white
+                  color: Colors.white,
                 ),
               ),
               style: ElevatedButton.styleFrom(backgroundColor: primaryColor),
@@ -548,7 +558,10 @@ class _RequestsPageState extends State<RequestsPage> {
 
   Stream<QuerySnapshot> getFilteredStream() {
     CollectionReference ref = FirebaseFirestore.instance.collection('requests');
-    Query query = ref.orderBy('timestamp', descending: true);
+    Query query = ref
+        .where('serviceDate', isGreaterThanOrEqualTo: DateTime.now()) // Only future dates
+        .orderBy('serviceDate') // Order by service date
+        .orderBy('timestamp', descending: true); // Then by creation time
 
     if (_filterType == 'Pet Type' && _filterValue != null) {
       query = query.where('petCategory', isEqualTo: _filterValue);
@@ -595,8 +608,8 @@ class _RequestsPageState extends State<RequestsPage> {
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
                 colors: [
-                  Color(0xFF008080),  // Professional teal
-                  Color(0xFF006D6D),  // Darker teal
+                  Color(0xFF008080),
+                  Color(0xFF006D6D),
                 ],
                 stops: [0.0, 1.0],
               ),
@@ -670,7 +683,7 @@ class _RequestsPageState extends State<RequestsPage> {
                               child: Text(
                                 "Clear filter",
                                 style: TextStyle(
-                                  color: Colors.white, // <-- text color set to white
+                                  color: Colors.white,
                                 ),
                               ),
                             ),
@@ -687,7 +700,7 @@ class _RequestsPageState extends State<RequestsPage> {
       body: _buildRequestList(),
       floatingActionButton: FloatingActionButton(
         onPressed: _showFormDialog,
-        child: Icon(Icons.add, size: 28,color: Colors.white,),
+        child: Icon(Icons.add, size: 28, color: Colors.white),
         backgroundColor: primaryColor,
         elevation: 4,
       ),
@@ -741,9 +754,19 @@ class _RequestsPageState extends State<RequestsPage> {
             final petName = request['petName'];
             final petCategory = request['petCategory'];
             final careDetails = request['careDetails'];
-            final reqDate = request['reqDate'];
             final location = request['location'] ?? 'Not specified';
             final userId = request['userId'];
+
+            // Handle both Timestamp and DateTime formats
+            final Timestamp? serviceTimestamp = request['serviceDate'];
+            final DateTime? serviceDate = serviceTimestamp?.toDate();
+            final String serviceDateStr = serviceDate != null
+                ? DateFormat('MMM dd, yyyy').format(serviceDate)
+                : 'Not specified';
+
+            final Timestamp? createdTimestamp = request['reqDate'] ?? request['timestamp'];
+            final DateTime createdDate = createdTimestamp?.toDate() ?? DateTime.now();
+            final String createdDateStr = DateFormat('MMM dd, yyyy').format(createdDate);
 
             return Card(
               margin: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
@@ -802,7 +825,6 @@ class _RequestsPageState extends State<RequestsPage> {
                                 text: requester,
                                 style: TextStyle(
                                   color: Colors.blue,
-
                                 ),
                               ),
                             ],
@@ -819,8 +841,26 @@ class _RequestsPageState extends State<RequestsPage> {
                         children: [
                           Icon(Icons.calendar_today, size: 16, color: Colors.grey),
                           SizedBox(width: 4),
-                          Text(reqDate),
-                          SizedBox(width: 16),
+                          Text('Posted: $createdDateStr'),
+                        ],
+                      ),
+                      SizedBox(height: 4),
+                      Row(
+                        children: [
+                          Icon(Icons.event_available, size: 16, color: Colors.green),
+                          SizedBox(width: 4),
+                          Text(
+                            'Service: $serviceDateStr',
+                            style: TextStyle(
+                              color: Colors.green[700],
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                      SizedBox(height: 4),
+                      Row(
+                        children: [
                           Icon(Icons.location_on, size: 16, color: Colors.grey),
                           SizedBox(width: 4),
                           Text(location),
