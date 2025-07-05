@@ -15,6 +15,8 @@ class _LoginPageState extends State<LoginPage> {
   final _formKey = GlobalKey<FormState>();
   bool _isLoading = false;
   bool _isSendingResetEmail = false;
+  bool _obscurePassword = true;
+
 
   Future<void> _login() async {
     if (!_formKey.currentState!.validate()) return;
@@ -160,13 +162,24 @@ class _LoginPageState extends State<LoginPage> {
                               decoration: InputDecoration(
                                 labelText: 'Password',
                                 prefixIcon: Icon(Icons.lock, color: Colors.teal),
+                                suffixIcon: IconButton(
+                                  icon: Icon(
+                                    _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                                    color: Colors.teal,
+                                  ),
+                                  onPressed: () {
+                                    setState(() {
+                                      _obscurePassword = !_obscurePassword;
+                                    });
+                                  },
+                                ),
                                 border: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(10),
                                 ),
                                 filled: true,
                                 fillColor: Colors.white.withOpacity(0.9),
                               ),
-                              obscureText: true,
+                              obscureText: _obscurePassword,
                               textInputAction: TextInputAction.done,
                               validator: (value) => value!.isEmpty
                                   ? 'Please enter your password'
@@ -175,6 +188,7 @@ class _LoginPageState extends State<LoginPage> {
                                   : null,
                               onFieldSubmitted: (_) => _login(),
                             ),
+
                             SizedBox(height: 10),
                             Align(
                               alignment: Alignment.centerRight,
