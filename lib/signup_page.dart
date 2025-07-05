@@ -58,6 +58,10 @@ class _SignUpPageState extends State<SignUpPage> {
         password: _passwordController.text.trim(),
       );
 
+      // Send email verification
+      await userCredential.user!.sendEmailVerification();
+
+      // Store user data in Firestore
       await _firestore.collection('users').doc(userCredential.user!.uid).set({
         'first_name': _firstNameController.text.trim(),
         'last_name': _lastNameController.text.trim(),
@@ -68,17 +72,13 @@ class _SignUpPageState extends State<SignUpPage> {
             : _usernameController.text.trim(),
         'address': _addressController.text.trim(),
         'uid': userCredential.user!.uid,
+        'email_verified': false,
         'created_at': FieldValue.serverTimestamp(),
       });
 
-      Navigator.pop(context);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Account created successfully!'),
-          behavior: SnackBarBehavior.floating,
-          backgroundColor: Colors.green,
-        ),
-      );
+      // Show verification dialog
+      _showVerificationDialog(userCredential.user!);
+
     } on FirebaseAuthException catch (e) {
       String errorMessage = 'Signup failed';
       if (e.code == 'email-already-in-use') {
@@ -99,6 +99,63 @@ class _SignUpPageState extends State<SignUpPage> {
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  void _showVerificationDialog(User user) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: Text('Verify Your Email'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('A verification email has been sent to:'),
+            SizedBox(height: 8),
+            Text(
+              user.email!,
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+            SizedBox(height: 16),
+            Text(
+              'Please check your inbox and verify your email address to complete registration.',
+              style: TextStyle(height: 1.5),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context); // Close dialog
+              Navigator.pop(context); // Go back to previous screen
+            },
+            child: Text('OK'),
+          ),
+          TextButton(
+            onPressed: () async {
+              try {
+                await user.sendEmailVerification();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Verification email resent!'),
+                    backgroundColor: Colors.green,
+                  ),
+                );
+              } catch (e) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Failed to resend verification email'),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+              }
+            },
+            child: Text('Resend Email'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -151,7 +208,6 @@ class _SignUpPageState extends State<SignUpPage> {
       ),
       body: CustomScrollView(
         slivers: [
-
           SliverPadding(
             padding: EdgeInsets.all(24),
             sliver: SliverList(
