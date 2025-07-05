@@ -6,6 +6,7 @@ import 'tips_page.dart';
 import 'profile_page.dart';
 import 'chat_list_page.dart';
 
+
 class HomeActivity extends StatefulWidget {
   @override
   _HomeActivityState createState() => _HomeActivityState();
