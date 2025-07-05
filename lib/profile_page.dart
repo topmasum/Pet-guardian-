@@ -24,6 +24,34 @@ class _ProfilePageState extends State<ProfilePage> {
     super.initState();
     _userDataFuture = getUserData();
   }
+  Stream<int> getUnreadRequestsCount() {
+    return _firestore
+        .collection('requests')
+        .where('userId', isEqualTo: _auth.currentUser?.uid)
+        .where('status', isEqualTo: 'new')
+        .snapshots()
+        .map((snapshot) => snapshot.docs.length);
+  }
+
+  Stream<int> getUnreadBookingsCount() {
+    return _firestore
+        .collection('bookings')
+        .where('userId', isEqualTo: _auth.currentUser?.uid)
+        .where('isNew', isEqualTo: true)
+        .snapshots()
+        .map((snapshot) => snapshot.docs.length);
+  }
+
+  Stream<int> getUnreadReviewsCount() {
+    return _firestore
+        .collection('reviews')
+        .where('userId', isEqualTo: _auth.currentUser?.uid)
+        .where('isNew', isEqualTo: true)
+        .snapshots()
+        .map((snapshot) => snapshot.docs.length);
+  }
+
+
 
   Future<Map<String, dynamic>?> getUserData() async {
     User? user = _auth.currentUser;

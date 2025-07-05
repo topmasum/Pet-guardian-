@@ -483,12 +483,21 @@ class _RequestsPageState extends State<RequestsPage> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: Text('No'),
+            child: Text(
+              'No',
+              style: TextStyle(color: Colors.grey[700]), // Optional: Change No button text color
+            ),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
-            child: Text('Yes'),
-            style: ElevatedButton.styleFrom(backgroundColor: primaryColor),
+            child: Text(
+              'Yes',
+              style: TextStyle(color: Colors.white), // White text for Yes button
+            ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.teal, // Teal background
+              foregroundColor: Colors.white, // This affects the text color too
+            ),
           ),
         ],
       ),
