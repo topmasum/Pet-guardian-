@@ -3,6 +3,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
+import 'chat_page.dart';
+
 class RequestsPage extends StatefulWidget {
   @override
   _RequestsPageState createState() => _RequestsPageState();
@@ -40,7 +42,7 @@ class _RequestsPageState extends State<RequestsPage> {
   void _pickDate(BuildContext context) async {
     final DateTime? pickedDate = await showDatePicker(
       context: context,
-      initialDate: DateTime.now().add(Duration(days: 1)),
+      initialDate: DateTime.now(),
       firstDate: DateTime.now(),
       lastDate: DateTime(2100),
       builder: (context, child) {
@@ -66,15 +68,7 @@ class _RequestsPageState extends State<RequestsPage> {
     if (!(_formKey.currentState?.validate() ?? false)) return;
     if (_selectedDate == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Please select a service date')),
-      );
-      return;
-    }
-
-    // Check if selected date is in the past
-    if (_selectedDate!.isBefore(DateTime.now())) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Service date cannot be in the past')),
+        SnackBar(content: Text('Please select a date')),
       );
       return;
     }
@@ -99,8 +93,7 @@ class _RequestsPageState extends State<RequestsPage> {
           'petCategory': _selectedPetCategory,
           'careDetails': _careDetailsController.text.trim(),
           'location': _selectedLocation,
-          'serviceDate': _selectedDate, // Store as DateTime
-          'reqDate': FieldValue.serverTimestamp(), // Auto-filled creation date
+          'reqDate': DateFormat('yyyy-MM-dd').format(_selectedDate!),
           'timestamp': FieldValue.serverTimestamp(),
         });
 
@@ -185,8 +178,7 @@ class _RequestsPageState extends State<RequestsPage> {
                               child: Text(
                                 'Cancel',
                                 style: TextStyle(color: Colors.grey[600]),
-                              ),
-                            ),
+                              ),),
                             SizedBox(width: 8),
                             ElevatedButton(
                               onPressed: _isSubmitting ? null : _submitRequest,
@@ -261,7 +253,7 @@ class _RequestsPageState extends State<RequestsPage> {
       onTap: () => _pickDate(context),
       child: InputDecorator(
         decoration: InputDecoration(
-          labelText: 'Service Needed Date',
+          labelText: 'Request Date',
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(10),
             borderSide: BorderSide(color: Colors.grey[300]!),
@@ -272,15 +264,14 @@ class _RequestsPageState extends State<RequestsPage> {
           ),
           filled: true,
           fillColor: Colors.grey[50],
-          hintText: 'When do you need the service?',
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text(
               _selectedDate != null
-                  ? DateFormat('MMM dd, yyyy').format(_selectedDate!)
-                  : 'Select service date',
+                  ? DateFormat('yyyy-MM-dd').format(_selectedDate!)
+                  : 'Select a date',
               style: TextStyle(fontSize: 16),
             ),
             Icon(Icons.calendar_today, color: primaryColor),
@@ -393,18 +384,62 @@ class _RequestsPageState extends State<RequestsPage> {
                           ),
                         ),
                       SizedBox(height: 20),
-                      ElevatedButton(
-                        onPressed: () => Navigator.pop(context),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: primaryColor,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        children: [
+                          ElevatedButton(
+                            onPressed: () => Navigator.pop(context),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.grey[500],
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                            ),
+                            child: Text(
+                              'Close',
+                              style: TextStyle(color: Colors.white),
+                            ),
                           ),
-                        ),
-                        child: Text(
-                          'Close',
-                          style: TextStyle(color: Colors.white),
-                        ),
+                          ElevatedButton.icon(
+                            onPressed: () async {
+                              Navigator.pop(context);
+
+                              User? currentUser = FirebaseAuth.instance.currentUser;
+                              if (currentUser == null) return;
+
+                              String myId = currentUser.uid;
+                              String otherId = userId;
+
+                              // Generate unique chatRoomId (same for both users)
+                              List<String> ids = [myId, otherId];
+                              ids.sort();
+                              String chatRoomId = ids.join('_');
+
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => ChatPage(
+                                    chatRoomId: chatRoomId,
+                                    otherUserId: otherId,
+                                    otherUserName: name,
+                                  ),
+                                ),
+                              );
+                            },
+
+                            icon: Icon(Icons.chat, color: Colors.white),
+                            label: Text(
+                              'Chat',
+                              style: TextStyle(color: Colors.white),
+                            ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: primaryColor,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
@@ -421,6 +456,7 @@ class _RequestsPageState extends State<RequestsPage> {
       );
     }
   }
+
 
   Future<bool> checkIfBooked(String requestId) async {
     User? user = FirebaseAuth.instance.currentUser;
@@ -477,7 +513,7 @@ class _RequestsPageState extends State<RequestsPage> {
             'petCategory': requestData['petCategory'],
             'careDetails': requestData['careDetails'],
             'location': requestData['location'],
-            'serviceDate': requestData['serviceDate'],
+            'reqDate': requestData['reqDate'],
             'bookingDate': FieldValue.serverTimestamp(),
             'status': 'Applied',
           });
@@ -530,9 +566,10 @@ class _RequestsPageState extends State<RequestsPage> {
               child: Text(
                 "Cancel",
                 style: TextStyle(
-                  color: Colors.red,
+                  color: Colors.red, // <-- text color set to white
                 ),
               ),
+
             ),
             ElevatedButton(
               onPressed: () {
@@ -545,7 +582,7 @@ class _RequestsPageState extends State<RequestsPage> {
               child: Text(
                 "Apply",
                 style: TextStyle(
-                  color: Colors.white,
+                  color: Colors.white, // <-- text color set to white
                 ),
               ),
               style: ElevatedButton.styleFrom(backgroundColor: primaryColor),
@@ -558,10 +595,7 @@ class _RequestsPageState extends State<RequestsPage> {
 
   Stream<QuerySnapshot> getFilteredStream() {
     CollectionReference ref = FirebaseFirestore.instance.collection('requests');
-    Query query = ref
-        .where('serviceDate', isGreaterThanOrEqualTo: DateTime.now()) // Only future dates
-        .orderBy('serviceDate') // Order by service date
-        .orderBy('timestamp', descending: true); // Then by creation time
+    Query query = ref.orderBy('timestamp', descending: true);
 
     if (_filterType == 'Pet Type' && _filterValue != null) {
       query = query.where('petCategory', isEqualTo: _filterValue);
@@ -608,8 +642,8 @@ class _RequestsPageState extends State<RequestsPage> {
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
                 colors: [
-                  Color(0xFF008080),
-                  Color(0xFF006D6D),
+                  Color(0xFF008080),  // Professional teal
+                  Color(0xFF006D6D),  // Darker teal
                 ],
                 stops: [0.0, 1.0],
               ),
@@ -683,7 +717,7 @@ class _RequestsPageState extends State<RequestsPage> {
                               child: Text(
                                 "Clear filter",
                                 style: TextStyle(
-                                  color: Colors.white,
+                                  color: Colors.white, // <-- text color set to white
                                 ),
                               ),
                             ),
@@ -700,7 +734,7 @@ class _RequestsPageState extends State<RequestsPage> {
       body: _buildRequestList(),
       floatingActionButton: FloatingActionButton(
         onPressed: _showFormDialog,
-        child: Icon(Icons.add, size: 28, color: Colors.white),
+        child: Icon(Icons.add, size: 28,color: Colors.white,),
         backgroundColor: primaryColor,
         elevation: 4,
       ),
@@ -754,19 +788,9 @@ class _RequestsPageState extends State<RequestsPage> {
             final petName = request['petName'];
             final petCategory = request['petCategory'];
             final careDetails = request['careDetails'];
+            final reqDate = request['reqDate'];
             final location = request['location'] ?? 'Not specified';
             final userId = request['userId'];
-
-            // Handle both Timestamp and DateTime formats
-            final Timestamp? serviceTimestamp = request['serviceDate'];
-            final DateTime? serviceDate = serviceTimestamp?.toDate();
-            final String serviceDateStr = serviceDate != null
-                ? DateFormat('MMM dd, yyyy').format(serviceDate)
-                : 'Not specified';
-
-            final Timestamp? createdTimestamp = request['reqDate'] ?? request['timestamp'];
-            final DateTime createdDate = createdTimestamp?.toDate() ?? DateTime.now();
-            final String createdDateStr = DateFormat('MMM dd, yyyy').format(createdDate);
 
             return Card(
               margin: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
@@ -825,6 +849,7 @@ class _RequestsPageState extends State<RequestsPage> {
                                 text: requester,
                                 style: TextStyle(
                                   color: Colors.blue,
+
                                 ),
                               ),
                             ],
@@ -841,26 +866,8 @@ class _RequestsPageState extends State<RequestsPage> {
                         children: [
                           Icon(Icons.calendar_today, size: 16, color: Colors.grey),
                           SizedBox(width: 4),
-                          Text('Posted: $createdDateStr'),
-                        ],
-                      ),
-                      SizedBox(height: 4),
-                      Row(
-                        children: [
-                          Icon(Icons.event_available, size: 16, color: Colors.green),
-                          SizedBox(width: 4),
-                          Text(
-                            'Service: $serviceDateStr',
-                            style: TextStyle(
-                              color: Colors.green[700],
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                      SizedBox(height: 4),
-                      Row(
-                        children: [
+                          Text(reqDate),
+                          SizedBox(width: 16),
                           Icon(Icons.location_on, size: 16, color: Colors.grey),
                           SizedBox(width: 4),
                           Text(location),
