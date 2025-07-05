@@ -865,13 +865,14 @@ class _RequestsPageState extends State<RequestsPage> {
                         children: [
                           Icon(Icons.calendar_today, size: 16, color: Colors.grey),
                           SizedBox(width: 4),
-                          Text(reqDate),
+                          Text('Service Date: $reqDate'),
                           SizedBox(width: 16),
                           Icon(Icons.location_on, size: 16, color: Colors.grey),
                           SizedBox(width: 4),
                           Text(location),
                         ],
                       ),
+
                       SizedBox(height: 12),
                       Align(
                         alignment: Alignment.centerRight,
