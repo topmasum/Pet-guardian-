@@ -7,6 +7,7 @@ import 'NotificationsPage.dart';
 import 'EditProfilePage.dart';
 import 'help.dart';
 import 'ReviewsPage.dart';
+import 'main.dart';  // Make sure this imports the HomePage widget
 
 class ProfilePage extends StatelessWidget {
   final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -28,7 +29,6 @@ class ProfilePage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.grey[50],
-
       body: FutureBuilder<Map<String, dynamic>?>(
         future: getUserData(),
         builder: (context, snapshot) {
@@ -79,7 +79,6 @@ class ProfilePage extends StatelessWidget {
             child: Column(
               children: [
                 // Header Section
-                // In your ProfilePage build method, replace the header section with this:
                 Container(
                   padding: EdgeInsets.only(top: MediaQuery.of(context).padding.top + 16),
                   decoration: BoxDecoration(
@@ -95,7 +94,6 @@ class ProfilePage extends StatelessWidget {
                   ),
                   child: Column(
                     children: [
-                      // Added back button row here
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 16.0),
                         child: Row(
@@ -104,7 +102,7 @@ class ProfilePage extends StatelessWidget {
                               icon: Icon(Icons.arrow_back, color: Colors.white),
                               onPressed: () => Navigator.pop(context),
                             ),
-                            Spacer(), // This pushes the back button to the left
+                            Spacer(),
                           ],
                         ),
                       ),
@@ -134,8 +132,7 @@ class ProfilePage extends StatelessWidget {
                           ),
                           if (ratingCount > 0)
                             Container(
-                              padding: EdgeInsets.symmetric(
-                                  horizontal: 12, vertical: 6),
+                              padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                               decoration: BoxDecoration(
                                   color: Colors.amber[700],
                                   borderRadius: BorderRadius.circular(20),
@@ -149,8 +146,7 @@ class ProfilePage extends StatelessWidget {
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Icon(Icons.star,
-                                      size: 18, color: Colors.white),
+                                  Icon(Icons.star, size: 18, color: Colors.white),
                                   SizedBox(width: 4),
                                   Text(
                                     '${rating.toStringAsFixed(1)} (${ratingCount})',
@@ -241,7 +237,7 @@ class ProfilePage extends StatelessWidget {
                             },
                           ),
                           _ProfileItem(
-                            icon: Icons.reviews_outlined,  // New icon for reviews
+                            icon: Icons.reviews_outlined,
                             label: 'My Reviews',
                             onTap: () => Navigator.push(
                               context,
@@ -256,7 +252,7 @@ class ProfilePage extends StatelessWidget {
                         context,
                         title: 'Account',
                         items: [
-                          _ProfileItem(  // Add this new item
+                          _ProfileItem(
                             icon: Icons.help_outline,
                             label: 'Help & Support',
                             onTap: () {
@@ -272,7 +268,12 @@ class ProfilePage extends StatelessWidget {
                             isDestructive: true,
                             onTap: () async {
                               await _auth.signOut();
-                              // Navigate to login screen
+
+                              // Navigate to HomePage from main.dart and clear back stack
+                              Navigator.of(context).pushAndRemoveUntil(
+                                MaterialPageRoute(builder: (context) => HomePage()),
+                                    (Route<dynamic> route) => false,
+                              );
                             },
                           ),
                         ],

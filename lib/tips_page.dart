@@ -131,27 +131,7 @@ class TipsPage extends StatelessWidget {
               ),
             ),
           ),
-          Row(
-            children: [
-              Expanded(
-                child: _buildHelplineCard(
-                  "Pet Poison Helpline",
-                  "(855) 764-7661",
-                  Icons.warning_amber,
-                  Colors.red[400]!,
-                ),
-              ),
-              SizedBox(width: 10),
-              Expanded(
-                child: _buildHelplineCard(
-                  "Vet Emergency",
-                  "(888) 426-4435",
-                  Icons.local_hospital,
-                  Colors.green[400]!,
-                ),
-              ),
-            ],
-          ),
+
           SizedBox(height: 10),
           _buildEmergencyButton(context),
         ],
@@ -202,9 +182,12 @@ class TipsPage extends StatelessWidget {
       width: double.infinity,
       child: ElevatedButton.icon(
         icon: Icon(Icons.emergency, color: Colors.white),
-        label: Text('Emergency Vet Assistance'),
+        label: Text(
+          'Emergency Vet Assistance',
+          style: TextStyle(color: Colors.white), // Explicit text color
+        ),
         style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.red[400],
+          backgroundColor: Colors.teal[700],
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),
