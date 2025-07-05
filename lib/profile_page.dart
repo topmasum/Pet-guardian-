@@ -7,11 +7,23 @@ import 'NotificationsPage.dart';
 import 'EditProfilePage.dart';
 import 'help.dart';
 import 'ReviewsPage.dart';
-import 'main.dart';  // Make sure this imports the HomePage widget
+import 'main.dart';
 
-class ProfilePage extends StatelessWidget {
+class ProfilePage extends StatefulWidget {
+  @override
+  _ProfilePageState createState() => _ProfilePageState();
+}
+
+class _ProfilePageState extends State<ProfilePage> {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  late Future<Map<String, dynamic>?> _userDataFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _userDataFuture = getUserData();
+  }
 
   Future<Map<String, dynamic>?> getUserData() async {
     User? user = _auth.currentUser;
@@ -25,266 +37,294 @@ class ProfilePage extends StatelessWidget {
     return null;
   }
 
+  Future<void> _handleRefresh() async {
+    setState(() {
+      _userDataFuture = getUserData();
+    });
+    // Wait for the future to complete
+    await _userDataFuture;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.grey[50],
-      body: FutureBuilder<Map<String, dynamic>?>(
-        future: getUserData(),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return Center(
-              child: CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation<Color>(Colors.teal),
-              ),
-            );
-          } else if (snapshot.hasError) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.error_outline, size: 48, color: Colors.red[400]),
-                  SizedBox(height: 16),
-                  Text('Error loading profile',
-                      style: TextStyle(
-                        fontSize: 18,
-                        color: Colors.grey[700],
-                      )),
-                  SizedBox(height: 8),
-                  TextButton(
-                    onPressed: () => Navigator.of(context).pushReplacement(
-                      MaterialPageRoute(builder: (_) => ProfilePage()),
+      body: RefreshIndicator(
+        onRefresh: _handleRefresh,
+        color: Colors.teal,
+        backgroundColor: Colors.white,
+        displacement: 40.0,
+        child: FutureBuilder<Map<String, dynamic>?>(
+          future: _userDataFuture,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return Center(
+                child: CircularProgressIndicator(
+                  valueColor: AlwaysStoppedAnimation<Color>(Colors.teal),
+                ),
+              );
+            } else if (snapshot.hasError) {
+              return Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.error_outline, size: 48, color: Colors.red[400]),
+                    SizedBox(height: 16),
+                    Text('Error loading profile',
+                        style: TextStyle(
+                          fontSize: 18,
+                          color: Colors.grey[700],
+                        )),
+                    SizedBox(height: 8),
+                    TextButton(
+                      onPressed: () => _handleRefresh(),
+                      child: Text('Retry', style: TextStyle(color: Colors.teal)),
                     ),
-                    child: Text('Retry', style: TextStyle(color: Colors.teal)),
-                  ),
-                ],
-              ),
-            );
-          } else if (!snapshot.hasData || snapshot.data == null) {
-            return Center(
-              child: Text('No user data found',
-                  style: TextStyle(fontSize: 18, color: Colors.grey[700])),
-            );
-          }
+                  ],
+                ),
+              );
+            } else if (!snapshot.hasData || snapshot.data == null) {
+              return Center(
+                child: Text('No user data found',
+                    style: TextStyle(fontSize: 18, color: Colors.grey[700])),
+              );
+            }
 
-          final userData = snapshot.data!;
-          final name = userData['username'] ?? 'Unknown';
-          final email = userData['email'] ?? 'No Email';
-          final profileImage = userData['profileImage'] ??
-              'assets/images/profile_placeholder.png';
-          final rating = userData['rating']?.toDouble() ?? 0.0;
-          final ratingCount = userData['ratingCount'] ?? 0;
+            final userData = snapshot.data!;
+            final name = userData['username'] ?? 'Unknown';
+            final email = userData['email'] ?? 'No Email';
+            final profileImage = userData['profileImage'] ??
+                'assets/images/profile_placeholder.png';
+            final rating = userData['rating']?.toDouble() ?? 0.0;
+            final ratingCount = userData['ratingCount'] ?? 0;
 
-          return SingleChildScrollView(
-            child: Column(
-              children: [
-                // Header Section
-                Container(
-                  padding: EdgeInsets.only(top: MediaQuery.of(context).padding.top + 16),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [Colors.teal[700]!, Colors.blue[600]!],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: BorderRadius.only(
-                      bottomLeft: Radius.circular(30),
-                      bottomRight: Radius.circular(30),
-                    ),
-                  ),
+            return CustomScrollView(
+              physics: AlwaysScrollableScrollPhysics(),
+              slivers: [
+                SliverToBoxAdapter(
                   child: Column(
                     children: [
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                        child: Row(
-                          children: [
-                            IconButton(
-                              icon: Icon(Icons.arrow_back, color: Colors.white),
-                              onPressed: () => Navigator.pop(context),
-                            ),
-                            Spacer(),
-                          ],
-                        ),
-                      ),
-                      SizedBox(height: 16),
-                      Stack(
-                        alignment: Alignment.bottomRight,
-                        children: [
-                          Container(
-                            padding: EdgeInsets.all(6),
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: Colors.white,
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black26,
-                                  blurRadius: 10,
-                                  offset: Offset(0, 4),
-                                ),
-                              ],
-                            ),
-                            child: CircleAvatar(
-                              radius: 60,
-                              backgroundImage: profileImage.startsWith('http')
-                                  ? NetworkImage(profileImage) as ImageProvider
-                                  : AssetImage(profileImage),
-                            ),
+                      // Header Section
+                      Container(
+                        padding: EdgeInsets.only(
+                            top: MediaQuery.of(context).padding.top + 16),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [Colors.teal[700]!, Colors.blue[600]!],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
                           ),
-                          if (ratingCount > 0)
-                            Container(
-                              padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                              decoration: BoxDecoration(
-                                  color: Colors.amber[700],
-                                  borderRadius: BorderRadius.circular(20),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.black12,
-                                      blurRadius: 6,
-                                      offset: Offset(0, 2),
-                                    ),
-                                  ]),
+                          borderRadius: BorderRadius.only(
+                            bottomLeft: Radius.circular(30),
+                            bottomRight: Radius.circular(30),
+                          ),
+                        ),
+                        child: Column(
+                          children: [
+                            Padding(
+                              padding:
+                              const EdgeInsets.symmetric(horizontal: 16.0),
                               child: Row(
-                                mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Icon(Icons.star, size: 18, color: Colors.white),
-                                  SizedBox(width: 4),
-                                  Text(
-                                    '${rating.toStringAsFixed(1)} (${ratingCount})',
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 14,
-                                    ),
+                                  IconButton(
+                                    icon: Icon(Icons.arrow_back,
+                                        color: Colors.white),
+                                    onPressed: () => Navigator.pop(context),
                                   ),
+                                  Spacer(),
                                 ],
                               ),
                             ),
-                        ],
-                      ),
-                      SizedBox(height: 20),
-                      Text(
-                        name,
-                        style: TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                          fontFamily: 'Montserrat',
+                            SizedBox(height: 16),
+                            Stack(
+                              alignment: Alignment.bottomRight,
+                              children: [
+                                Container(
+                                  padding: EdgeInsets.all(6),
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color: Colors.white,
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black26,
+                                        blurRadius: 10,
+                                        offset: Offset(0, 4),
+                                      ),
+                                    ],
+                                  ),
+                                  child: CircleAvatar(
+                                    radius: 60,
+                                    backgroundImage:
+                                    profileImage.startsWith('http')
+                                        ? NetworkImage(profileImage)
+                                    as ImageProvider
+                                        : AssetImage(profileImage),
+                                  ),
+                                ),
+                                if (ratingCount > 0)
+                                  Container(
+                                    padding: EdgeInsets.symmetric(
+                                        horizontal: 12, vertical: 6),
+                                    decoration: BoxDecoration(
+                                        color: Colors.amber[700],
+                                        borderRadius: BorderRadius.circular(20),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: Colors.black12,
+                                            blurRadius: 6,
+                                            offset: Offset(0, 2),
+                                          ),
+                                        ]),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(Icons.star,
+                                            size: 18, color: Colors.white),
+                                        SizedBox(width: 4),
+                                        Text(
+                                          '${rating.toStringAsFixed(1)} (${ratingCount})',
+                                          style: TextStyle(
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 14,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                              ],
+                            ),
+                            SizedBox(height: 20),
+                            Text(
+                              name,
+                              style: TextStyle(
+                                fontSize: 24,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                                fontFamily: 'Montserrat',
+                              ),
+                            ),
+                            SizedBox(height: 4),
+                            Text(
+                              email,
+                              style: TextStyle(
+                                fontSize: 16,
+                                color: Colors.white.withOpacity(0.9),
+                              ),
+                            ),
+                            SizedBox(height: 30),
+                          ],
                         ),
                       ),
-                      SizedBox(height: 4),
-                      Text(
-                        email,
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: Colors.white.withOpacity(0.9),
-                        ),
-                      ),
-                      SizedBox(height: 30),
                     ],
                   ),
                 ),
-                // Content Section
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
-                  child: Column(
-                    children: [
-                      // Activity Section
-                      _buildSectionCard(
-                        context,
-                        title: 'Activity',
-                        items: [
-                          _ProfileItem(
-                            icon: Icons.notifications_outlined,
-                            label: 'Notifications',
-                            badgeStream: _firestore
-                                .collection('notifications')
-                                .where('userId', isEqualTo: _auth.currentUser?.uid)
-                                .where('read', isEqualTo: false)
-                                .snapshots(),
-                            onTap: () => Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                  builder: (context) => NotificationsPage()),
-                            ),
-                          ),
-                          _ProfileItem(
-                            icon: Icons.list_alt_outlined,
-                            label: 'My Requests',
-                            onTap: () => Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                  builder: (context) => MyRequestsPage()),
-                            ),
-                          ),
-                          _ProfileItem(
-                            icon: Icons.bookmark_outline,
-                            label: 'My Bookings',
-                            onTap: () => Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                  builder: (context) => MyBookingsPage()),
-                            ),
-                          ),
-                          _ProfileItem(
-                            icon: Icons.edit_outlined,
-                            label: 'Edit Profile',
-                            onTap: () {
-                              Navigator.push(
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 20, vertical: 24),
+                    child: Column(
+                      children: [
+                        // Activity Section
+                        _buildSectionCard(
+                          context,
+                          title: 'Activity',
+                          items: [
+                            _ProfileItem(
+                              icon: Icons.notifications_outlined,
+                              label: 'Notifications',
+                              badgeStream: _firestore
+                                  .collection('notifications')
+                                  .where('userId',
+                                  isEqualTo: _auth.currentUser?.uid)
+                                  .where('read', isEqualTo: false)
+                                  .snapshots(),
+                              onTap: () => Navigator.push(
                                 context,
                                 MaterialPageRoute(
-                                    builder: (context) => EditProfilePage()),
-                              );
-                            },
-                          ),
-                          _ProfileItem(
-                            icon: Icons.reviews_outlined,
-                            label: 'My Reviews',
-                            onTap: () => Navigator.push(
-                              context,
-                              MaterialPageRoute(builder: (context) => ReviewsPage()),
+                                    builder: (context) => NotificationsPage()),
+                              ),
                             ),
-                          ),
-                        ],
-                      ),
-                      SizedBox(height: 20),
-                      // Account Section
-                      _buildSectionCard(
-                        context,
-                        title: 'Account',
-                        items: [
-                          _ProfileItem(
-                            icon: Icons.help_outline,
-                            label: 'Help & Support',
-                            onTap: () {
-                              Navigator.push(
+                            _ProfileItem(
+                              icon: Icons.list_alt_outlined,
+                              label: 'My Requests',
+                              onTap: () => Navigator.push(
                                 context,
-                                MaterialPageRoute(builder: (context) => HelpPage()),
-                              );
-                            },
-                          ),
-                          _ProfileItem(
-                            icon: Icons.logout,
-                            label: 'Sign Out',
-                            isDestructive: true,
-                            onTap: () async {
-                              await _auth.signOut();
-
-                              // Navigate to HomePage from main.dart and clear back stack
-                              Navigator.of(context).pushAndRemoveUntil(
-                                MaterialPageRoute(builder: (context) => HomePage()),
-                                    (Route<dynamic> route) => false,
-                              );
-                            },
-                          ),
-                        ],
-                      ),
-                    ],
+                                MaterialPageRoute(
+                                    builder: (context) => MyRequestsPage()),
+                              ),
+                            ),
+                            _ProfileItem(
+                              icon: Icons.bookmark_outline,
+                              label: 'My Bookings',
+                              onTap: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                    builder: (context) => MyBookingsPage()),
+                              ),
+                            ),
+                            _ProfileItem(
+                              icon: Icons.edit_outlined,
+                              label: 'Edit Profile',
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                      builder: (context) => EditProfilePage()),
+                                );
+                              },
+                            ),
+                            _ProfileItem(
+                              icon: Icons.reviews_outlined,
+                              label: 'My Reviews',
+                              onTap: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                    builder: (context) => ReviewsPage()),
+                              ),
+                            ),
+                          ],
+                        ),
+                        SizedBox(height: 20),
+                        // Account Section
+                        _buildSectionCard(
+                          context,
+                          title: 'Account',
+                          items: [
+                            _ProfileItem(
+                              icon: Icons.help_outline,
+                              label: 'Help & Support',
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                      builder: (context) => HelpPage()),
+                                );
+                              },
+                            ),
+                            _ProfileItem(
+                              icon: Icons.logout,
+                              label: 'Sign Out',
+                              isDestructive: true,
+                              onTap: () async {
+                                await _auth.signOut();
+                                Navigator.of(context).pushAndRemoveUntil(
+                                  MaterialPageRoute(
+                                      builder: (context) => HomePage()),
+                                      (Route<dynamic> route) => false,
+                                );
+                              },
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ],
-            ),
-          );
-        },
+            );
+          },
+        ),
       ),
     );
   }

@@ -226,6 +226,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
             icon: Icon(Icons.save, color: Colors.white),
             onPressed: _saveChanges,
             tooltip: 'Save Changes',
+            color: Colors.white, // This makes the ripple effect white
           ),
         ],
         flexibleSpace: ClipRRect(
@@ -421,8 +422,8 @@ class _EditProfilePageState extends State<EditProfilePage> {
 
   Widget _buildSaveButton() {
     return ElevatedButton.icon(
-      icon: Icon(Icons.save),
-      label: Text('Save Changes'),
+      icon: Icon(Icons.save, color: Colors.white),
+      label: Text('Save Changes',style: TextStyle(color: Colors.white),),
       style: ElevatedButton.styleFrom(
         padding: EdgeInsets.symmetric(vertical: 16),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
