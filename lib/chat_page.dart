@@ -8,7 +8,7 @@ class ChatPage extends StatefulWidget {
   final String otherUserId;
   final String otherUserName;
 
-  ChatPage({
+  const ChatPage({
     required this.chatRoomId,
     required this.otherUserId,
     required this.otherUserName,
@@ -20,11 +20,12 @@ class ChatPage extends StatefulWidget {
 
 class _ChatPageState extends State<ChatPage> {
   final TextEditingController _messageController = TextEditingController();
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final _scrollController = ScrollController();
+  final _firestore = FirebaseFirestore.instance;
+  final _auth = FirebaseAuth.instance;
   late User _currentUser;
   late DocumentReference _chatRoomRef;
-  final ScrollController _scrollController = ScrollController();
+  bool _isFirstLoad = true;
 
   @override
   void initState() {
@@ -32,13 +33,19 @@ class _ChatPageState extends State<ChatPage> {
     _currentUser = _auth.currentUser!;
     _chatRoomRef = _firestore.collection('chatRooms').doc(widget.chatRoomId);
     _updateReadStatus();
-
   }
 
   @override
   void dispose() {
     _scrollController.dispose();
+    _messageController.dispose();
     super.dispose();
+  }
+
+  void _scrollToBottom() {
+    if (_scrollController.hasClients) {
+      _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
+    }
   }
 
   Future<void> _updateReadStatus() async {
@@ -87,15 +94,7 @@ class _ChatPageState extends State<ChatPage> {
 
       await batch.commit();
       _messageController.clear();
-
-      // Scroll to bottom after sending
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _scrollController.animateTo(
-          _scrollController.position.minScrollExtent,
-          duration: Duration(milliseconds: 300),
-          curve: Curves.easeOut,
-        );
-      });
+      _scrollToBottom();
     } catch (e) {
       debugPrint('Error sending message: $e');
       ScaffoldMessenger.of(context).showSnackBar(
@@ -116,7 +115,7 @@ class _ChatPageState extends State<ChatPage> {
             child: StreamBuilder<QuerySnapshot>(
               stream: _chatRoomRef
                   .collection('messages')
-                  .orderBy('timestamp', descending: true) // Newest first in DB
+                  .orderBy('timestamp', descending: false) // Oldest first
                   .snapshots(),
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
@@ -129,47 +128,67 @@ class _ChatPageState extends State<ChatPage> {
 
                 final messages = snapshot.data?.docs ?? [];
 
-                return ListView.builder(
-                  controller: _scrollController,
-                  reverse: false, // Display oldest at top, newest at bottom
-                  itemCount: messages.length,
-                  itemBuilder: (context, index) {
-                    // We need to reverse the index to show newest at bottom
-                    final reversedIndex = messages.length - 1 - index;
-                    final message = messages[reversedIndex];
-                    final isMe = message['senderId'] == _currentUser.uid;
+                if (_isFirstLoad && messages.isNotEmpty) {
+                  _isFirstLoad = false;
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    _scrollToBottom();
+                  });
+                }
 
-                    return Container(
-                      margin: EdgeInsets.symmetric(
-                        vertical: 4,
-                        horizontal: 8,
-                      ),
-                      alignment: isMe
-                          ? Alignment.centerRight
-                          : Alignment.centerLeft,
-                      child: Container(
-                        padding: EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: isMe ? Colors.blue[100] : Colors.grey[200],
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            Text(message['text']),
-                            SizedBox(height: 4),
-                            Text(
-                              _formatTimestamp(message['timestamp']),
-                              style: TextStyle(
-                                fontSize: 10,
-                                color: Colors.grey,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
+                return NotificationListener<ScrollNotification>(
+                  onNotification: (notification) {
+                    if (notification is ScrollUpdateNotification) {
+                      // Auto-scroll when new messages arrive if near bottom
+                      final isNearBottom = _scrollController.position.pixels >
+                          _scrollController.position.maxScrollExtent - 100;
+                      if (isNearBottom) {
+                        WidgetsBinding.instance.addPostFrameCallback((_) {
+                          _scrollToBottom();
+                        });
+                      }
+                    }
+                    return false;
                   },
+                  child: ListView.builder(
+                    controller: _scrollController,
+                    reverse: false, // Oldest at top, newest at bottom
+                    itemCount: messages.length,
+                    itemBuilder: (context, index) {
+                      final message = messages[index];
+                      final isMe = message['senderId'] == _currentUser.uid;
+
+                      return Container(
+                        margin: EdgeInsets.symmetric(
+                          vertical: 4,
+                          horizontal: 8,
+                        ),
+                        alignment: isMe
+                            ? Alignment.centerRight
+                            : Alignment.centerLeft,
+                        child: Container(
+                          padding: EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: isMe ? Colors.blue[100] : Colors.grey[200],
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              Text(message['text']),
+                              SizedBox(height: 4),
+                              Text(
+                                _formatTimestamp(message['timestamp']),
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  color: Colors.grey,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
                 );
               },
             ),
