@@ -1,7 +1,12 @@
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/services.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:http/http.dart' as http;
 
 class EditProfilePage extends StatefulWidget {
   @override
@@ -21,6 +26,8 @@ class _EditProfilePageState extends State<EditProfilePage> {
 
   bool _isLoading = false;
   bool _emailEditable = false;
+
+  final ImagePicker _picker = ImagePicker();
 
   @override
   void initState() {
@@ -62,6 +69,64 @@ class _EditProfilePageState extends State<EditProfilePage> {
         _isLoading = false;
       });
     }
+  }
+
+  Future<void> _pickAndUploadImage() async {
+    try {
+      final XFile? pickedFile = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 70);
+      if (pickedFile == null) return; // User canceled
+
+      setState(() {
+        _isLoading = true;
+      });
+
+      File imageFile = File(pickedFile.path);
+      String uploadedImageUrl = await _uploadToCloudinary(imageFile);
+
+      setState(() {
+        _profileImageController.text = uploadedImageUrl;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("Image uploaded successfully"),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("Failed to upload image"),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
+  Future<String> _uploadToCloudinary(File imageFile) async {
+    // Replace these with your own Cloudinary credentials
+    final cloudName = 'dwscbimll';
+    final uploadPreset = 'flutter_profile_uploads';
+
+    final uri = Uri.parse('https://api.cloudinary.com/v1_1/$cloudName/image/upload');
+
+    var request = http.MultipartRequest('POST', uri)
+      ..fields['upload_preset'] = uploadPreset
+      ..files.add(await http.MultipartFile.fromPath('file', imageFile.path));
+
+    final response = await request.send();
+
+    if (response.statusCode != 200 && response.statusCode != 201) {
+      throw Exception('Failed to upload image to Cloudinary');
+    }
+
+    final respStr = await response.stream.bytesToString();
+    final jsonResp = json.decode(respStr);
+    return jsonResp['secure_url'] as String;
   }
 
   Future<void> _saveChanges() async {
@@ -243,10 +308,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
           keyboardType: TextInputType.url,
         ),
         TextButton(
-          onPressed: () {
-            // Implement image picker functionality here
-            // _pickImageFromGallery();
-          },
+          onPressed: _pickAndUploadImage,
           child: Text('Upload Image', style: TextStyle(color: Colors.teal)),
         ),
       ],
@@ -330,7 +392,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
           return 'Please enter your phone number';
         }
         if (value.length < 10) {
-          return 'Phone number should be at least 10 digits';
+          return 'Phone number must be at least 10 digits';
         }
         return null;
       },
@@ -347,7 +409,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
         filled: true,
         fillColor: Colors.grey[50],
       ),
-      maxLines: 2,
+      keyboardType: TextInputType.streetAddress,
       validator: (value) {
         if (value == null || value.isEmpty) {
           return 'Please enter your address';
@@ -358,24 +420,15 @@ class _EditProfilePageState extends State<EditProfilePage> {
   }
 
   Widget _buildSaveButton() {
-    return ElevatedButton(
-      onPressed: _saveChanges,
+    return ElevatedButton.icon(
+      icon: Icon(Icons.save),
+      label: Text('Save Changes'),
       style: ElevatedButton.styleFrom(
-        backgroundColor: Colors.teal,
         padding: EdgeInsets.symmetric(vertical: 16),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
-        elevation: 2,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        backgroundColor: Colors.teal,
       ),
-      child: Text(
-        "SAVE PROFILE",
-        style: TextStyle(
-          color: Colors.white,
-          fontSize: 16,
-          fontWeight: FontWeight.bold,
-        ),
-      ),
+      onPressed: _saveChanges,
     );
   }
 }
