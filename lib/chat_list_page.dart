@@ -5,6 +5,8 @@ import 'package:intl/intl.dart';
 import 'chat_page.dart';
 
 class ChatListPage extends StatefulWidget {
+  const ChatListPage({Key? key}) : super(key: key);
+
   @override
   _ChatListPageState createState() => _ChatListPageState();
 }
@@ -12,25 +14,168 @@ class ChatListPage extends StatefulWidget {
 class _ChatListPageState extends State<ChatListPage> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
-  final Map<String, Map<String, dynamic>> _userCache = {};
+  User? _currentUser;
 
-  Stream<QuerySnapshot> _getChatRoomsStream() {
-    final userId = _auth.currentUser?.uid;
-    if (userId == null) return const Stream.empty();
+  @override
+  void initState() {
+    super.initState();
+    _auth.authStateChanges().listen((User? user) {
+      setState(() {
+        _currentUser = user;
+      });
+    });
+  }
 
-    return _firestore
-        .collection('chatRooms')
-        .where('users', arrayContains: userId)
-        .orderBy('lastMessageTime', descending: true)
-        .snapshots(includeMetadataChanges: true);
+  Widget _buildChatListItem(DocumentSnapshot chatRoomDoc) {
+    if (_currentUser == null) {
+      return const SizedBox();
+    }
+
+    final chatRoomData = chatRoomDoc.data() as Map<String, dynamic>;
+    final users = chatRoomData['users'] as Map<String, dynamic>? ?? {};
+    final lastMessage = chatRoomData['lastMessage'] as String? ?? '';
+    final lastMessageTime = chatRoomData['lastMessageTime'] as Timestamp?;
+    final lastMessageSender = chatRoomData['lastMessageSender'] as String? ?? '';
+    final unreadCount = chatRoomData['unreadCount'] as int? ?? 0;
+    final isLastMessageRead = chatRoomData['lastMessageRead'] as bool? ?? true;
+
+    // Get the other user's ID
+    String otherUserId = users.keys.firstWhere(
+          (userId) => userId != _currentUser!.uid,
+      orElse: () => '',
+    );
+
+    if (otherUserId.isEmpty) return const SizedBox();
+
+    return FutureBuilder<DocumentSnapshot>(
+      future: _firestore.collection('users').doc(otherUserId).get(),
+      builder: (context, userSnapshot) {
+        if (!userSnapshot.hasData || !userSnapshot.data!.exists) {
+          return ListTile(
+            title: Text('Unknown User ($otherUserId)'),
+            subtitle: Text(lastMessage),
+          );
+        }
+
+        final userData = userSnapshot.data!.data() as Map<String, dynamic>;
+        final firstName = userData['first_name'] as String? ?? '';
+        final lastName = userData['last_name'] as String? ?? '';
+        final userName = '$firstName $lastName';
+        final userPhoto = userData['profileImage'] as String?;
+
+        return ListTile(
+          leading: CircleAvatar(
+            radius: 28,
+            backgroundImage: userPhoto != null ? NetworkImage(userPhoto) : null,
+            child: userPhoto == null
+                ? Text(
+              userName.isNotEmpty ? userName[0].toUpperCase() : '?',
+              style: const TextStyle(fontSize: 20),
+            )
+                : null,
+          ),
+          title: Text(
+            userName,
+            style: TextStyle(
+              fontWeight: unreadCount > 0 || !isLastMessageRead
+                  ? FontWeight.bold
+                  : FontWeight.normal,
+            ),
+          ),
+          subtitle: Text(
+            lastMessageSender == _currentUser!.uid
+                ? 'You: $lastMessage'
+                : lastMessage,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontWeight: unreadCount > 0 || !isLastMessageRead
+                  ? FontWeight.bold
+                  : FontWeight.normal,
+              color: unreadCount > 0 || !isLastMessageRead
+                  ? Colors.black
+                  : Colors.grey,
+            ),
+          ),
+          trailing: Column(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                lastMessageTime != null
+                    ? _formatLastMessageTime(lastMessageTime.toDate())
+                    : '',
+                style: TextStyle(
+                  color: unreadCount > 0 || !isLastMessageRead
+                      ? Colors.teal
+                      : Colors.grey,
+                  fontSize: 12,
+                ),
+              ),
+              if (unreadCount > 0)
+                Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: const BoxDecoration(
+                    color: Colors.teal,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Text(
+                    unreadCount.toString(),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => ChatPage(
+                  chatRoomId: chatRoomDoc.id,
+                  otherUserId: otherUserId,
+                  otherUserName: userName,
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  String _formatLastMessageTime(DateTime dateTime) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final yesterday = DateTime(now.year, now.month, now.day - 1);
+
+    final messageDate = DateTime(dateTime.year, dateTime.month, dateTime.day);
+
+    if (messageDate == today) {
+      return DateFormat('h:mm a').format(dateTime);
+    } else if (messageDate == yesterday) {
+      return 'Yesterday';
+    } else {
+      return DateFormat('MMM d').format(dateTime);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_currentUser == null) {
+      return const Scaffold(
+        body: Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: Text(
-          'Chats',
+          'Messages',
           style: TextStyle(
             fontSize: 24,
             fontWeight: FontWeight.w600,
@@ -42,10 +187,7 @@ class _ChatListPageState extends State<ChatListPage> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         toolbarHeight: 70,
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => Navigator.pop(context),
-        ),
+        iconTheme: IconThemeData(color: Colors.white),
         flexibleSpace: ClipRRect(
           borderRadius: BorderRadius.only(
             bottomLeft: Radius.circular(20),
@@ -74,139 +216,36 @@ class _ChatListPageState extends State<ChatListPage> {
         ),
       ),
       body: StreamBuilder<QuerySnapshot>(
-        stream: _getChatRoomsStream(),
+        stream: _firestore
+            .collection('chatRooms')
+            .where('users.${_currentUser!.uid}', isEqualTo: true)
+            .orderBy('lastMessageTime', descending: true)
+            .snapshots(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return Center(child: CircularProgressIndicator());
+            return const Center(child: CircularProgressIndicator());
           }
 
           if (snapshot.hasError) {
-            debugPrint('Firestore Error: ${snapshot.error}');
-            return _buildErrorWidget(snapshot.error);
+            return Center(child: Text('Error: ${snapshot.error}'));
           }
 
-          if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-            return Center(child: Text('No chats yet'));
+          final chatRooms = snapshot.data?.docs ?? [];
+
+          if (chatRooms.isEmpty) {
+            return const Center(
+              child: Text('No conversations yet'),
+            );
           }
 
-          return _buildChatList(snapshot.data!.docs);
+          return ListView.builder(
+            itemCount: chatRooms.length,
+            itemBuilder: (context, index) {
+              return _buildChatListItem(chatRooms[index]);
+            },
+          );
         },
       ),
-    );
-  }
-
-  Widget _buildErrorWidget(dynamic error) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text('Error loading chats'),
-          SizedBox(height: 16),
-          ElevatedButton(
-            onPressed: () => setState(() {}),
-            child: Text('Retry'),
-          ),
-          SizedBox(height: 16),
-          Text(
-            'If this persists, please check your internet connection',
-            style: TextStyle(color: Colors.grey),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildChatList(List<QueryDocumentSnapshot> chatRooms) {
-    // Get all other user IDs at once
-    final otherUserIds = chatRooms.map((chatRoom) {
-      final users = List<String>.from(chatRoom['users']);
-      return users.firstWhere((id) => id != _auth.currentUser?.uid);
-    }).where((id) => id != null).toList();
-
-    return FutureBuilder<QuerySnapshot>(
-      future: _firestore.collection('users')
-          .where(FieldPath.documentId, whereIn: otherUserIds)
-          .get(),
-      builder: (context, userSnapshot) {
-        if (userSnapshot.connectionState == ConnectionState.waiting) {
-          return Center(child: CircularProgressIndicator());
-        }
-
-        // Cache user data
-        if (userSnapshot.hasData) {
-          for (final doc in userSnapshot.data!.docs) {
-            _userCache[doc.id] = doc.data() as Map<String, dynamic>;
-          }
-        }
-
-        return ListView.builder(
-          itemCount: chatRooms.length,
-          itemBuilder: (context, index) {
-            final chatRoom = chatRooms[index];
-            final users = List<String>.from(chatRoom['users']);
-            final otherUserId = users.firstWhere(
-                  (id) => id != _auth.currentUser?.uid,
-              orElse: () => '',
-            );
-
-            if (otherUserId.isEmpty) return SizedBox();
-
-            final userData = _userCache[otherUserId];
-            final userName = userData?['username'] ?? 'Unknown';
-            final userImage = userData?['profileImage'];
-            final lastMessage = chatRoom['lastMessage'] ?? '';
-            final lastMessageTime = chatRoom['lastMessageTime']?.toDate();
-            final isUnread = chatRoom['lastMessageSender'] != _auth.currentUser?.uid &&
-                !(chatRoom['lastMessageRead'] ?? false);
-
-            return ListTile(
-              leading: CircleAvatar(
-                backgroundImage: userImage != null
-                    ? NetworkImage(userImage) as ImageProvider
-                    : AssetImage('assets/images/profile_placeholder.png') as ImageProvider,
-              ),
-              title: Text(userName),
-              subtitle: Text(
-                lastMessage,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-              trailing: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  if (lastMessageTime != null)
-                    Text(
-                      DateFormat('HH:mm').format(lastMessageTime),
-                      style: TextStyle(fontSize: 12),
-                    ),
-                  if (isUnread)
-                    Container(
-                      width: 12,
-                      height: 12,
-                      decoration: BoxDecoration(
-                        color: Colors.blue,
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                ],
-              ),
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => ChatPage(
-                      chatRoomId: chatRoom.id,
-                      otherUserId: otherUserId,
-                      otherUserName: userName,
-                    ),
-                  ),
-                );
-              },
-            );
-          },
-        );
-      },
     );
   }
 }

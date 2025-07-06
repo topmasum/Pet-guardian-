@@ -33,17 +33,33 @@ class _ChatPageState extends State<ChatPage> {
     super.initState();
     _currentUser = _auth.currentUser!;
     _chatRoomRef = _firestore.collection('chatRooms').doc(widget.chatRoomId);
+    _ensureChatRoomExists();
     _markMessagesAsRead();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _scrollToBottom(animated: false);
     });
   }
 
-  @override
-  void dispose() {
-    _messageController.dispose();
-    _scrollController.dispose();
-    super.dispose();
+  Future<void> _ensureChatRoomExists() async {
+    try {
+      final doc = await _chatRoomRef.get();
+      if (!doc.exists) {
+        await _chatRoomRef.set({
+          'users': {
+            _currentUser.uid: true,
+            widget.otherUserId: true,
+          },
+          'createdAt': FieldValue.serverTimestamp(),
+          'lastMessage': '',
+          'lastMessageTime': FieldValue.serverTimestamp(),
+          'lastMessageSender': '',
+          'lastMessageRead': true,
+          'unreadCount': 0,
+        });
+      }
+    } catch (e) {
+      debugPrint('Error ensuring chat room exists: $e');
+    }
   }
 
   Future<void> _markMessagesAsRead() async {
@@ -78,6 +94,8 @@ class _ChatPageState extends State<ChatPage> {
     final messageText = _messageController.text.trim();
 
     try {
+      await _ensureChatRoomExists();
+
       final messageRef = _chatRoomRef.collection('messages').doc();
       final timestamp = FieldValue.serverTimestamp();
 
@@ -90,6 +108,10 @@ class _ChatPageState extends State<ChatPage> {
         });
 
         transaction.update(_chatRoomRef, {
+          'users': {
+            _currentUser.uid: true,
+            widget.otherUserId: true,
+          },
           'lastMessage': messageText,
           'lastMessageSender': _currentUser.uid,
           'lastMessageTime': timestamp,
@@ -103,8 +125,8 @@ class _ChatPageState extends State<ChatPage> {
     } catch (e) {
       debugPrint('Error sending message: $e');
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Failed to send message'),
+        SnackBar(
+          content: Text('Failed to send message: ${e.toString()}'),
           backgroundColor: Colors.red,
         ),
       );
@@ -136,15 +158,17 @@ class _ChatPageState extends State<ChatPage> {
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
       child: Row(
-        mainAxisAlignment:
-        isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
+        mainAxisAlignment: isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
           if (!isMe) ...[
-            const CircleAvatar(
+            CircleAvatar(
               radius: 14,
               backgroundColor: Colors.grey,
-              child: Icon(Icons.person, size: 16, color: Colors.white),
+              child: Text(
+                widget.otherUserName[0].toUpperCase(),
+                style: TextStyle(color: Colors.white, fontSize: 12),
+              ),
             ),
             const SizedBox(width: 4),
           ],
@@ -155,9 +179,7 @@ class _ChatPageState extends State<ChatPage> {
                 horizontal: 14,
               ),
               decoration: BoxDecoration(
-                color: isMe
-                    ? Colors.teal
-                    : Colors.grey.shade200,
+                color: isMe ? Colors.teal : Colors.grey.shade200,
                 borderRadius: BorderRadius.only(
                   topLeft: const Radius.circular(16),
                   topRight: const Radius.circular(16),
@@ -166,8 +188,7 @@ class _ChatPageState extends State<ChatPage> {
                 ),
               ),
               child: Column(
-                crossAxisAlignment:
-                isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
                 children: [
                   Text(
                     messageText,
@@ -210,6 +231,58 @@ class _ChatPageState extends State<ChatPage> {
     if (timestamp == null) return '';
     final dateTime = timestamp.toDate();
     return DateFormat('h:mm a').format(dateTime);
+  }
+
+  Widget _buildMessageInput() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.2),
+            blurRadius: 4,
+            offset: const Offset(0, -2),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: TextField(
+              controller: _messageController,
+              decoration: InputDecoration(
+                hintText: 'Type a message...',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(24),
+                  borderSide: BorderSide.none,
+                ),
+                filled: true,
+                fillColor: Colors.grey.shade100,
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
+              ),
+              maxLines: 5,
+              minLines: 1,
+              onSubmitted: (_) => _sendMessage(),
+            ),
+          ),
+          IconButton(
+            icon: _isSending
+                ? const SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+                : const Icon(Icons.send),
+            onPressed: _isSending ? null : _sendMessage,
+            color: Colors.teal,
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -274,9 +347,7 @@ class _ChatPageState extends State<ChatPage> {
                 }
 
                 if (snapshot.hasError) {
-                  return Center(
-                    child: Text('Error: ${snapshot.error}'),
-                  );
+                  return Center(child: Text('Error loading messages'));
                 }
 
                 final messages = snapshot.data?.docs ?? [];
@@ -297,67 +368,6 @@ class _ChatPageState extends State<ChatPage> {
             ),
           ),
           _buildMessageInput(),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildMessageInput() {
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: 8,
-        vertical: 8,
-      ),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.2),
-            blurRadius: 4,
-            offset: const Offset(0, -2),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          IconButton(
-            icon: const Icon(Icons.attach_file),
-            onPressed: () {
-              // Add attachment functionality
-            },
-          ),
-          Expanded(
-            child: TextField(
-              controller: _messageController,
-              decoration: InputDecoration(
-                hintText: 'Type a message...',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(24),
-                  borderSide: BorderSide.none,
-                ),
-                filled: true,
-                fillColor: Colors.grey.shade100,
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 12,
-                ),
-              ),
-              maxLines: 5,
-              minLines: 1,
-              onSubmitted: (_) => _sendMessage(),
-            ),
-          ),
-          IconButton(
-            icon: _isSending
-                ? const SizedBox(
-              width: 20,
-              height: 20,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            )
-                : const Icon(Icons.send),
-            onPressed: _isSending ? null : _sendMessage,
-            color: Colors.teal,
-          ),
         ],
       ),
     );
