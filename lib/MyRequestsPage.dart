@@ -85,65 +85,32 @@ class _MyRequestsPageState extends State<MyRequestsPage> {
 
   Future<void> _updateBookingStatus(String bookingId, String status) async {
     try {
-      // 1. Update the booking status
       await _firestore.collection('bookings').doc(bookingId).update({
         'status': status,
         'processedAt': Timestamp.now(),
       });
 
-      // 2. Get related documents
       var bookingDoc = await _firestore.collection('bookings').doc(bookingId).get();
       var bookingData = bookingDoc.data() as Map<String, dynamic>;
-      var requestId = bookingData['requestId'];
-
-      // 3. Send notification
-      var requestDoc = await _firestore.collection('requests').doc(requestId).get();
+      var requestDoc = await _firestore.collection('requests').doc(bookingData['requestId']).get();
       var requestData = requestDoc.data() as Map<String, dynamic>;
+
       await _sendStatusNotification(
         bookingData['userId'],
         requestData['petName'] ?? 'your pet',
         status,
       );
 
-      // 4. SPECIAL CASE: If approved, mark request as fulfilled
-      if (status == 'Approved') {
-        await _firestore.collection('requests').doc(requestId).update({
-          'isFulfilled': true,
-          'approvedApplicant': bookingData['userId'],
-        });
-
-        // Reject all other applicants
-        final otherBookings = await _firestore
-            .collection('bookings')
-            .where('requestId', isEqualTo: requestId)
-            .where('userId', isNotEqualTo: bookingData['userId'])
-            .get();
-
-        final batch = _firestore.batch();
-        for (var booking in otherBookings.docs) {
-          batch.update(booking.reference, {
-            'status': 'Rejected',
-            'processedAt': Timestamp.now(),
-          });
-        }
-        await batch.commit();
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Applicant approved! Others have been rejected')),
-        );
-      }
-
-      // 5. Refresh UI
       setState(() {
         _futureRequests = getRequests();
       });
-
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Failed to update status: $e')),
       );
     }
   }
+
   Future<void> _sendStatusNotification(String userId, String petName, String status) async {
     try {
       var userDoc = await _firestore.collection('users').doc(_auth.currentUser!.uid).get();
@@ -165,7 +132,6 @@ class _MyRequestsPageState extends State<MyRequestsPage> {
 
   Future<void> _deleteRequest(String requestId) async {
     try {
-      // First delete all bookings for this request
       final bookings = await _firestore
           .collection('bookings')
           .where('requestId', isEqualTo: requestId)
@@ -175,7 +141,6 @@ class _MyRequestsPageState extends State<MyRequestsPage> {
         await booking.reference.delete();
       }
 
-      // Then delete the request itself
       await _firestore.collection('requests').doc(requestId).delete();
 
       setState(() {
