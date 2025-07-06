@@ -94,7 +94,6 @@ class _RequestsPageState extends State<RequestsPage> {
           'location': _selectedLocation,
           'reqDate': DateFormat('yyyy-MM-dd').format(_selectedDate!),
           'timestamp': FieldValue.serverTimestamp(),
-          'isFulfilled': false,
         });
 
         // Clear form
@@ -604,8 +603,7 @@ class _RequestsPageState extends State<RequestsPage> {
 
   Stream<QuerySnapshot> getFilteredStream() {
     CollectionReference ref = FirebaseFirestore.instance.collection('requests');
-    Query query = ref.where('isFulfilled', isEqualTo: false) // Add this line
-        .orderBy('timestamp', descending: true);
+    Query query = ref.orderBy('timestamp', descending: true);
 
     if (_filterType == 'Pet Type' && _filterValue != null) {
       query = query.where('petCategory', isEqualTo: _filterValue);
