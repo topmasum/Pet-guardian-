@@ -13,6 +13,39 @@ class _ChatListPageState extends State<ChatListPage> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final Map<String, Map<String, dynamic>> _userCache = {};
+  final Map<String, int> _unreadCounts = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _preCacheUsers();
+  }
+
+  Future<void> _preCacheUsers() async {
+    final userId = _auth.currentUser?.uid;
+    if (userId == null) return;
+
+    final chatRooms = await _firestore
+        .collection('chatRooms')
+        .where('users', arrayContains: userId)
+        .get();
+
+    final otherUserIds = chatRooms.docs.expand((chatRoom) {
+      final users = List<String>.from(chatRoom['users']);
+      return users.where((id) => id != userId);
+    }).toSet().toList();
+
+    if (otherUserIds.isNotEmpty) {
+      final usersSnapshot = await _firestore
+          .collection('users')
+          .where(FieldPath.documentId, whereIn: otherUserIds)
+          .get();
+
+      for (final doc in usersSnapshot.docs) {
+        _userCache[doc.id] = doc.data() as Map<String, dynamic>;
+      }
+    }
+  }
 
   Stream<QuerySnapshot> _getChatRoomsStream() {
     final userId = _auth.currentUser?.uid;
@@ -29,7 +62,7 @@ class _ChatListPageState extends State<ChatListPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(
+        title: const Text(
           'Chats',
           style: TextStyle(
             fontSize: 24,
@@ -43,17 +76,17 @@ class _ChatListPageState extends State<ChatListPage> {
         elevation: 0,
         toolbarHeight: 70,
         leading: IconButton(
-          icon: Icon(Icons.arrow_back, color: Colors.white),
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.pop(context),
         ),
         flexibleSpace: ClipRRect(
-          borderRadius: BorderRadius.only(
+          borderRadius: const BorderRadius.only(
             bottomLeft: Radius.circular(20),
             bottomRight: Radius.circular(20),
           ),
           child: Container(
             decoration: BoxDecoration(
-              gradient: LinearGradient(
+              gradient: const LinearGradient(
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
                 colors: [
@@ -66,7 +99,7 @@ class _ChatListPageState extends State<ChatListPage> {
                   color: Colors.black.withOpacity(0.15),
                   blurRadius: 12,
                   spreadRadius: 0.5,
-                  offset: Offset(0, 6),
+                  offset: const Offset(0, 6),
                 ),
               ],
             ),
@@ -77,7 +110,7 @@ class _ChatListPageState extends State<ChatListPage> {
         stream: _getChatRoomsStream(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return Center(child: CircularProgressIndicator());
+            return const Center(child: CircularProgressIndicator());
           }
 
           if (snapshot.hasError) {
@@ -86,11 +119,32 @@ class _ChatListPageState extends State<ChatListPage> {
           }
 
           if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-            return Center(child: Text('No chats yet'));
+            return _buildEmptyState();
           }
 
           return _buildChatList(snapshot.data!.docs);
         },
+      ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.chat_bubble_outline, size: 64, color: Colors.grey[400]),
+          const SizedBox(height: 16),
+          const Text(
+            'No chats yet',
+            style: TextStyle(fontSize: 18, color: Colors.grey),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Start a conversation with someone!',
+            style: TextStyle(color: Colors.grey[600]),
+          ),
+        ],
       ),
     );
   }
@@ -100,16 +154,19 @@ class _ChatListPageState extends State<ChatListPage> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Text('Error loading chats'),
-          SizedBox(height: 16),
+          const Icon(Icons.error_outline, size: 64, color: Colors.red),
+          const SizedBox(height: 16),
+          const Text('Error loading chats'),
+          const SizedBox(height: 16),
           ElevatedButton(
             onPressed: () => setState(() {}),
-            child: Text('Retry'),
+            child: const Text('Retry'),
           ),
-          SizedBox(height: 16),
+          const SizedBox(height: 16),
           Text(
-            'If this persists, please check your internet connection',
-            style: TextStyle(color: Colors.grey),
+            error.toString(),
+            style: const TextStyle(color: Colors.grey),
+            textAlign: TextAlign.center,
           ),
         ],
       ),
@@ -117,93 +174,92 @@ class _ChatListPageState extends State<ChatListPage> {
   }
 
   Widget _buildChatList(List<QueryDocumentSnapshot> chatRooms) {
-    // Get all other user IDs at once
-    final otherUserIds = chatRooms.map((chatRoom) {
-      final users = List<String>.from(chatRoom['users']);
-      return users.firstWhere((id) => id != _auth.currentUser?.uid);
-    }).where((id) => id != null).toList();
+    return ListView.builder(
+      itemCount: chatRooms.length,
+      itemBuilder: (context, index) {
+        final chatRoom = chatRooms[index];
+        final users = List<String>.from(chatRoom['users']);
+        final otherUserId = users.firstWhere(
+              (id) => id != _auth.currentUser?.uid,
+          orElse: () => '',
+        );
 
-    return FutureBuilder<QuerySnapshot>(
-      future: _firestore.collection('users')
-          .where(FieldPath.documentId, whereIn: otherUserIds)
-          .get(),
-      builder: (context, userSnapshot) {
-        if (userSnapshot.connectionState == ConnectionState.waiting) {
-          return Center(child: CircularProgressIndicator());
-        }
+        if (otherUserId.isEmpty) return const SizedBox();
 
-        // Cache user data
-        if (userSnapshot.hasData) {
-          for (final doc in userSnapshot.data!.docs) {
-            _userCache[doc.id] = doc.data() as Map<String, dynamic>;
-          }
-        }
+        final userData = _userCache[otherUserId] ?? {};
+        final userName = userData['username'] ?? 'Unknown';
+        final userImage = userData['profileImage'];
+        final lastMessage = chatRoom['lastMessage'] ?? '';
+        final lastMessageTime = chatRoom['lastMessageTime']?.toDate();
+        final unreadCount = chatRoom['unreadCount'] ?? 0;
+        final isUnread = unreadCount > 0 &&
+            chatRoom['lastMessageSender'] != _auth.currentUser?.uid;
 
-        return ListView.builder(
-          itemCount: chatRooms.length,
-          itemBuilder: (context, index) {
-            final chatRoom = chatRooms[index];
-            final users = List<String>.from(chatRoom['users']);
-            final otherUserId = users.firstWhere(
-                  (id) => id != _auth.currentUser?.uid,
-              orElse: () => '',
-            );
-
-            if (otherUserId.isEmpty) return SizedBox();
-
-            final userData = _userCache[otherUserId];
-            final userName = userData?['username'] ?? 'Unknown';
-            final userImage = userData?['profileImage'];
-            final lastMessage = chatRoom['lastMessage'] ?? '';
-            final lastMessageTime = chatRoom['lastMessageTime']?.toDate();
-            final isUnread = chatRoom['lastMessageSender'] != _auth.currentUser?.uid &&
-                !(chatRoom['lastMessageRead'] ?? false);
-
-            return ListTile(
-              leading: CircleAvatar(
-                backgroundImage: userImage != null
-                    ? NetworkImage(userImage) as ImageProvider
-                    : AssetImage('assets/images/profile_placeholder.png') as ImageProvider,
-              ),
-              title: Text(userName),
-              subtitle: Text(
-                lastMessage,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-              trailing: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  if (lastMessageTime != null)
-                    Text(
-                      DateFormat('HH:mm').format(lastMessageTime),
-                      style: TextStyle(fontSize: 12),
-                    ),
-                  if (isUnread)
-                    Container(
-                      width: 12,
-                      height: 12,
-                      decoration: BoxDecoration(
-                        color: Colors.blue,
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                ],
-              ),
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => ChatPage(
-                      chatRoomId: chatRoom.id,
-                      otherUserId: otherUserId,
-                      otherUserName: userName,
+        return ListTile(
+          leading: CircleAvatar(
+            radius: 24,
+            backgroundImage: userImage != null
+                ? NetworkImage(userImage) as ImageProvider
+                : const AssetImage('assets/images/profile_placeholder.png'),
+          ),
+          title: Text(
+            userName,
+            style: TextStyle(
+              fontWeight: isUnread ? FontWeight.bold : FontWeight.normal,
+            ),
+          ),
+          subtitle: Text(
+            lastMessage,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontWeight: isUnread ? FontWeight.w500 : FontWeight.normal,
+            ),
+          ),
+          trailing: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              if (lastMessageTime != null)
+                Text(
+                  DateFormat('HH:mm').format(lastMessageTime),
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: isUnread ? Colors.blue : Colors.grey,
+                  ),
+                ),
+              if (isUnread)
+                Container(
+                  margin: const EdgeInsets.only(top: 4),
+                  padding: const EdgeInsets.all(4),
+                  decoration: const BoxDecoration(
+                    color: Colors.blue,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Text(
+                    unreadCount > 9 ? '9+' : unreadCount.toString(),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
                     ),
                   ),
-                );
-              },
-            );
+                ),
+            ],
+          ),
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => ChatPage(
+                  chatRoomId: chatRoom.id,
+                  otherUserId: otherUserId,
+                  otherUserName: userName,
+                ),
+              ),
+            ).then((_) {
+              // Refresh the chat list when returning from chat page
+              if (mounted) setState(() {});
+            });
           },
         );
       },
