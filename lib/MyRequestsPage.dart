@@ -132,17 +132,34 @@ class _MyRequestsPageState extends State<MyRequestsPage> {
 
   Future<void> _deleteRequest(String requestId) async {
     try {
+      // 1. Get all bookings for this request
       final bookings = await _firestore
           .collection('bookings')
           .where('requestId', isEqualTo: requestId)
           .get();
 
+      // 2. Process each booking to preserve reviews
       for (var booking in bookings.docs) {
-        await booking.reference.delete();
+        final bookingData = booking.data();
+
+        // Only modify if this booking has ratings we need to preserve
+        if (bookingData['hasRated'] == true) {
+          // Update booking to remove request reference but keep review data
+          await booking.reference.update({
+            'requestId': FieldValue.delete(),  // Remove the request reference
+            'isActive': false,  // Mark as inactive
+            // Keep all rating-related fields intact
+          });
+        } else {
+          // For bookings without ratings, delete normally
+          await booking.reference.delete();
+        }
       }
 
+      // 3. Delete the request document
       await _firestore.collection('requests').doc(requestId).delete();
 
+      // 4. Update UI
       setState(() {
         _futureRequests = getRequests();
       });
@@ -152,11 +169,10 @@ class _MyRequestsPageState extends State<MyRequestsPage> {
       );
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to delete request: $e')),
+        SnackBar(content: Text('Failed to delete request: ${e.toString()}')),
       );
     }
   }
-
   Future<void> _showRatingDialog(String bookingId, String userId, String userName) async {
     double rating = 0;
     TextEditingController commentController = TextEditingController();
@@ -250,15 +266,45 @@ class _MyRequestsPageState extends State<MyRequestsPage> {
 
   Future<void> _submitRating(String bookingId, String userId, double rating, String comment) async {
     try {
-      // Store the original rating first
+      // First, get all necessary data before making any updates
+      final bookingDoc = await _firestore.collection('bookings').doc(bookingId).get();
+      if (!bookingDoc.exists) throw Exception('Booking not found');
+
+      final bookingData = bookingDoc.data() as Map<String, dynamic>;
+      final requestId = bookingData['requestId'];
+
+      // Get request data to preserve pet information
+      final requestDoc = await _firestore.collection('requests').doc(requestId).get();
+      final requestData = requestDoc.data() as Map<String, dynamic>? ?? {};
+
+      // Get reviewer (pet owner) information
+      final reviewerDoc = await _firestore.collection('users').doc(_auth.currentUser!.uid).get();
+      final reviewerData = reviewerDoc.data() as Map<String, dynamic>;
+
+      // 1. Create a standalone review document
+      await _firestore.collection('reviews').add({
+        'caregiverId': userId,
+        'reviewerId': _auth.currentUser!.uid,
+        'reviewerName': '${reviewerData['first_name']} ${reviewerData['last_name']}',
+        'bookingId': bookingId,
+        'requestId': requestId,
+        'rating': rating,
+        'comment': comment.isNotEmpty ? comment : null,
+        'timestamp': Timestamp.now(),
+        'petName': requestData['petName'] ?? 'Unknown Pet',
+        'petCategory': requestData['petCategory'] ?? 'Unknown',
+        'isActive': true,
+      });
+
+      // 2. Update the booking document (original implementation)
       await _firestore.collection('bookings').doc(bookingId).update({
         'hasRated': true,
         'originalRating': rating,
-        'originalComment': comment.isNotEmpty ? comment : null, // Store the comment
+        'originalComment': comment.isNotEmpty ? comment : null,
         'ratingSeen': false,
       });
 
-      // Then update the user's aggregated rating
+      // 3. Update the user's aggregated rating
       DocumentSnapshot userDoc = await _firestore.collection('users').doc(userId).get();
       Map<String, dynamic> userData = userDoc.data() as Map<String, dynamic>;
 
@@ -267,25 +313,40 @@ class _MyRequestsPageState extends State<MyRequestsPage> {
 
       double newRating = ((currentRating * ratingCount) + rating) / (ratingCount + 1);
 
-      // Store the review in the user's reviews subcollection
+      // 4. Store the review in the user's subcollection (for easy access)
       await _firestore.collection('users').doc(userId).collection('reviews').add({
         'rating': rating,
         'comment': comment.isNotEmpty ? comment : null,
         'timestamp': Timestamp.now(),
         'bookingId': bookingId,
+        'requestId': requestId,
         'ratedById': _auth.currentUser!.uid,
+        'ratedByName': '${reviewerData['first_name']} ${reviewerData['last_name']}',
+        'petName': requestData['petName'] ?? 'Unknown Pet',
+        'petCategory': requestData['petCategory'] ?? 'Unknown',
       });
 
-      // Update the user's main rating data
+      // 5. Update the user's main rating data
       await _firestore.collection('users').doc(userId).update({
         'rating': newRating,
         'ratingCount': ratingCount + 1,
       });
 
-      // Update the cached values in the booking
+      // 6. Update the cached values in the booking
       await _firestore.collection('bookings').doc(bookingId).update({
         'cachedRating': newRating,
         'cachedRatingCount': ratingCount + 1,
+      });
+
+      // 7. Send notification to the caregiver about the new review
+      await _firestore.collection('notifications').add({
+        'userId': userId,
+        'title': 'New Rating Received',
+        'message': '${reviewerData['first_name']} has rated your service for ${requestData['petName'] ?? 'a pet'}',
+        'type': 'new_review',
+        'read': false,
+        'timestamp': Timestamp.now(),
+        'relatedId': bookingId,
       });
 
       setState(() {
@@ -297,7 +358,7 @@ class _MyRequestsPageState extends State<MyRequestsPage> {
       );
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to submit rating: $e')),
+        SnackBar(content: Text('Failed to submit rating: ${e.toString()}')),
       );
     }
   }
