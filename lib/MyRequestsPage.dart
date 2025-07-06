@@ -85,18 +85,18 @@ class _MyRequestsPageState extends State<MyRequestsPage> {
 
   Future<void> _updateBookingStatus(String bookingId, String status) async {
     try {
-      // First update the booking status
+      // 1. Update the booking status
       await _firestore.collection('bookings').doc(bookingId).update({
         'status': status,
         'processedAt': Timestamp.now(),
       });
 
-      // Get the request ID from the booking
+      // 2. Get related documents
       var bookingDoc = await _firestore.collection('bookings').doc(bookingId).get();
       var bookingData = bookingDoc.data() as Map<String, dynamic>;
       var requestId = bookingData['requestId'];
 
-      // Send notification to the applicant
+      // 3. Send notification
       var requestDoc = await _firestore.collection('requests').doc(requestId).get();
       var requestData = requestDoc.data() as Map<String, dynamic>;
       await _sendStatusNotification(
@@ -105,27 +105,35 @@ class _MyRequestsPageState extends State<MyRequestsPage> {
         status,
       );
 
-      // SPECIAL CASE: If approved, delete the request and all its bookings
+      // 4. SPECIAL CASE: If approved, mark request as fulfilled
       if (status == 'Approved') {
-        // Delete all bookings for this request (including the one we just approved)
-        final bookings = await _firestore
+        await _firestore.collection('requests').doc(requestId).update({
+          'isFulfilled': true,
+          'approvedApplicant': bookingData['userId'],
+        });
+
+        // Reject all other applicants
+        final otherBookings = await _firestore
             .collection('bookings')
             .where('requestId', isEqualTo: requestId)
+            .where('userId', isNotEqualTo: bookingData['userId'])
             .get();
 
         final batch = _firestore.batch();
-        for (var booking in bookings.docs) {
-          batch.delete(booking.reference);
+        for (var booking in otherBookings.docs) {
+          batch.update(booking.reference, {
+            'status': 'Rejected',
+            'processedAt': Timestamp.now(),
+          });
         }
-        batch.delete(_firestore.collection('requests').doc(requestId));
         await batch.commit();
 
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Applicant approved and request removed')),
+          SnackBar(content: Text('Applicant approved! Others have been rejected')),
         );
       }
 
-      // Refresh the UI
+      // 5. Refresh UI
       setState(() {
         _futureRequests = getRequests();
       });
