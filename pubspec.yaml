@@ -34,6 +34,8 @@ dependencies:
   flutter_rating_bar: ^4.0.0
   image_picker: ^0.8.7+4
   http: ^0.13.6
+  cloudinary_public: ^0.23.1
+  path: ^1.8.3
 
 
 
