@@ -64,26 +64,58 @@ class _ChatPageState extends State<ChatPage> {
 
   Future<void> _markMessagesAsRead() async {
     try {
+      // First check if chat room exists
+      final chatRoomSnapshot = await _chatRoomRef.get();
+
+      if (!chatRoomSnapshot.exists) {
+        debugPrint('Chat room document does not exist, creating new one');
+        await _chatRoomRef.set({
+          'participants': [_currentUser.uid, widget.otherUserId],
+          'createdAt': FieldValue.serverTimestamp(),
+          'lastMessage': '',
+          'lastMessageSender': '',
+          'lastMessageTime': FieldValue.serverTimestamp(),
+          'lastMessageRead': true,
+          'unreadCount': 0,
+        });
+        return;
+      }
+
+      // Get all unread messages from the other user
       final unreadMessages = await _chatRoomRef
           .collection('messages')
           .where('senderId', isEqualTo: widget.otherUserId)
           .where('read', isEqualTo: false)
           .get();
 
+      // Update all unread messages in a batch
       if (unreadMessages.docs.isNotEmpty) {
         final batch = _firestore.batch();
         for (var doc in unreadMessages.docs) {
           batch.update(doc.reference, {'read': true});
         }
         await batch.commit();
+        debugPrint('Marked ${unreadMessages.docs.length} messages as read');
       }
 
+      // Update chat room metadata
       await _chatRoomRef.update({
         'lastMessageRead': true,
         'unreadCount': 0,
+        'lastUpdate': FieldValue.serverTimestamp(),
       });
+
     } catch (e) {
-      debugPrint('Error marking messages as read: $e');
+      debugPrint('Error in _markMessagesAsRead: $e');
+      // You might want to show a user-friendly error here
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error updating message status: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 
